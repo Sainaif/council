@@ -65,6 +65,7 @@ export interface StartSessionRequest {
 
 export const useCouncilStore = defineStore('council', () => {
   const currentSession = ref<Session | null>(null)
+  const currentSessionId = ref<string | null>(null)
   const responses = ref<Map<string, Response>>(new Map())
   const status = ref<SessionStatus>('idle')
   const ws = ref<WebSocket | null>(null)
@@ -94,6 +95,9 @@ export const useCouncilStore = defineStore('council', () => {
     try {
       const response = await api.post('/api/council/start', request)
       const { session_id } = response.data
+
+      // Store the session ID
+      currentSessionId.value = session_id
 
       // Connect to WebSocket
       connectWebSocket(session_id)
@@ -192,7 +196,10 @@ export const useCouncilStore = defineStore('council', () => {
 
       case 'council.completed':
         status.value = 'completed'
-        fetchSession(currentSession.value?.id || '')
+        // Fetch the full session data using stored session ID
+        if (currentSessionId.value) {
+          fetchSession(currentSessionId.value)
+        }
         break
 
       case 'council.failed':
@@ -244,6 +251,7 @@ export const useCouncilStore = defineStore('council', () => {
 
   function reset() {
     currentSession.value = null
+    currentSessionId.value = null
     responses.value.clear()
     status.value = 'idle'
     error.value = null
@@ -252,6 +260,7 @@ export const useCouncilStore = defineStore('council', () => {
 
   return {
     currentSession,
+    currentSessionId,
     responses,
     sortedResponses,
     anonymizedResponses,

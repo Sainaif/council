@@ -15,6 +15,8 @@ const debateRounds = ref(3)
 const enableDevil = ref(false)
 const enableMystery = ref(false)
 const showFullResponses = ref(false)
+const showVotingResults = ref(false)
+const showModelReveal = ref(false)
 
 // Fetch models if not already loaded
 onMounted(() => {
@@ -42,6 +44,42 @@ watch(
   },
   { immediate: true }
 )
+
+// Group responses by round for debate mode
+const responsesByRound = computed(() => {
+  if (!councilStore.currentSession?.responses) return {}
+  const grouped: Record<number, any[]> = {}
+  for (const response of councilStore.currentSession.responses) {
+    const round = response.round || 1
+    if (!grouped[round]) grouped[round] = []
+    grouped[round].push(response)
+  }
+  return grouped
+})
+
+const rounds = computed(() => {
+  return Object.keys(responsesByRound.value).map(Number).sort((a, b) => a - b)
+})
+
+// Calculate voting results
+const voteResults = computed(() => {
+  if (!councilStore.currentSession?.votes) return []
+  const counts: Record<string, { points: number, firstPlace: number }> = {}
+  
+  for (const vote of councilStore.currentSession.votes) {
+    if (!vote.ranked_responses) continue
+    const rankings = vote.ranked_responses
+    rankings.forEach((label: string, index: number) => {
+      if (!counts[label]) counts[label] = { points: 0, firstPlace: 0 }
+      counts[label].points += (rankings.length - index) * vote.weight
+      if (index === 0) counts[label].firstPlace++
+    })
+  }
+  
+  return Object.entries(counts)
+    .sort(([, a], [, b]) => b.points - a.points)
+    .map(([label, data]) => ({ label, ...data }))
+})
 
 function toggleModel(modelId: string) {
   const index = selectedModels.value.indexOf(modelId)
@@ -71,6 +109,9 @@ function newCouncil() {
   question.value = ''
   selectedModels.value = []
   userVote.value = []
+  showFullResponses.value = false
+  showVotingResults.value = false
+  showModelReveal.value = false
 }
 
 function moveUp(index: number) {
@@ -304,6 +345,7 @@ async function submitVote() {
         </div>
 
         <button
+          v-if="councilStore.status === 'voting'"
           @click="submitVote"
           :disabled="userVote.length === 0"
           class="btn btn-primary w-full mt-4"
@@ -312,22 +354,112 @@ async function submitVote() {
         </button>
       </div>
 
-      <!-- Synthesis -->
-      <div v-if="councilStore.currentSession?.synthesis" class="card p-4 border-primary">
-        <h2 class="text-lg font-medium mb-4 text-primary">{{ t('arena.synthesis') }}</h2>
-        <div class="prose prose-invert max-w-none">
-          <p class="whitespace-pre-wrap">{{ councilStore.currentSession.synthesis }}</p>
+      <!-- Completed Session Results -->
+      <template v-if="councilStore.status === 'completed'">
+        <!-- Synthesis (Council's Conclusion) -->
+        <div v-if="councilStore.currentSession?.synthesis" class="card p-4 border-primary bg-primary/5">
+          <h2 class="text-lg font-medium mb-3 text-primary">🎯 Council's Conclusion</h2>
+          <div class="prose prose-invert max-w-none">
+            <p class="whitespace-pre-wrap">{{ councilStore.currentSession.synthesis }}</p>
+          </div>
         </div>
-      </div>
 
-      <!-- New Council Button -->
-      <button
-        v-if="councilStore.status === 'completed'"
-        @click="newCouncil"
-        class="btn btn-secondary w-full"
-      >
-        {{ t('arena.new_council') }}
-      </button>
+        <!-- Minority Report -->
+        <div v-if="councilStore.currentSession?.minority_report" class="card p-4 border-warning bg-warning/5">
+          <h2 class="text-lg font-medium mb-3 text-warning">⚠️ Minority Report</h2>
+          <div class="prose prose-invert max-w-none">
+            <p class="whitespace-pre-wrap">{{ councilStore.currentSession.minority_report }}</p>
+          </div>
+        </div>
+
+        <!-- Voting Results -->
+        <div v-if="voteResults.length > 0" class="card p-4">
+          <button 
+            @click="showVotingResults = !showVotingResults"
+            class="w-full flex items-center justify-between"
+          >
+            <h2 class="text-lg font-medium">🗳️ Voting Results ({{ councilStore.currentSession?.votes?.length || 0 }} votes)</h2>
+            <span class="text-text-muted">{{ showVotingResults ? '▼' : '▶' }}</span>
+          </button>
+          
+          <div v-if="showVotingResults" class="mt-4 space-y-2">
+            <div
+              v-for="(result, index) in voteResults"
+              :key="result.label"
+              class="flex items-center gap-3 p-2 rounded-lg"
+              :class="index === 0 ? 'bg-primary/10 border border-primary/30' : 'bg-surface'"
+            >
+              <span class="text-lg font-bold w-8" :class="index === 0 ? 'text-primary' : 'text-text-muted'">
+                #{{ index + 1 }}
+              </span>
+              <span class="font-medium flex-1">{{ result.label }}</span>
+              <span class="text-sm text-text-secondary">{{ result.points.toFixed(1) }} pts</span>
+              <span v-if="result.firstPlace > 0" class="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">
+                🥇 {{ result.firstPlace }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Debate Rounds (for debate mode with multiple rounds) -->
+        <div v-if="rounds.length > 1" class="card p-4">
+          <h2 class="text-lg font-medium mb-4">💬 All Debate Rounds</h2>
+          <div class="space-y-4">
+            <div v-for="round in rounds" :key="round" class="border border-zinc-800 rounded-lg overflow-hidden">
+              <div class="p-3 bg-surface font-medium">
+                Round {{ round }} ({{ responsesByRound[round]?.length || 0 }} responses)
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 p-3">
+                <div
+                  v-for="response in responsesByRound[round]"
+                  :key="response.id"
+                  class="bg-background rounded p-3"
+                >
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-primary font-medium text-sm">{{ response.anonymous_label }}</span>
+                    <span class="text-xs text-text-muted">{{ response.response_time_ms }}ms</span>
+                  </div>
+                  <p class="whitespace-pre-wrap text-sm max-h-32 overflow-auto">{{ response.content }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model Reveal -->
+        <div class="card p-4">
+          <button 
+            @click="showModelReveal = !showModelReveal"
+            class="w-full flex items-center justify-between"
+          >
+            <h2 class="text-lg font-medium">🎭 Model Reveal</h2>
+            <span class="text-text-muted">{{ showModelReveal ? '▼' : '▶' }}</span>
+          </button>
+          
+          <div v-if="showModelReveal && councilStore.currentSession?.responses?.length" class="mt-4">
+            <p class="text-sm text-text-secondary mb-3">See which model was behind each response</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <div
+                v-for="response in [...new Map(councilStore.currentSession.responses.map((r: any) => [r.anonymous_label, r])).values()]"
+                :key="response.anonymous_label"
+                class="flex items-center gap-2 p-2 bg-surface rounded"
+              >
+                <span class="text-primary font-medium">{{ response.anonymous_label }}</span>
+                <span class="text-text-muted">=</span>
+                <span class="text-sm truncate">{{ response.model_id }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Council Button -->
+        <button
+          @click="newCouncil"
+          class="btn btn-secondary w-full"
+        >
+          {{ t('arena.new_council') }}
+        </button>
+      </template>
     </div>
 
     <!-- Error -->
