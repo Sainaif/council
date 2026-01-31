@@ -41,12 +41,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o council ./cmd/council
 FROM alpine:3.23
 
 # Install runtime dependencies and GitHub Copilot CLI
-# Download directly from GitHub releases to avoid install script issues
-RUN apk add --no-cache ca-certificates tzdata git curl bash \
-    && COPILOT_VERSION=$(curl -sL https://api.github.com/repos/github/copilot-cli/releases/latest | grep '"tag_name"' | cut -d'"' -f4) \
-    && curl -sL "https://github.com/github/copilot-cli/releases/download/${COPILOT_VERSION}/copilot-linux-x64.tar.gz" -o /tmp/copilot.tar.gz \
-    && tar -xzf /tmp/copilot.tar.gz -C /usr/local/bin \
-    && rm /tmp/copilot.tar.gz \
+# Using official install script with gcompat for glibc compatibility
+RUN apk add --no-cache ca-certificates tzdata git curl bash gcompat libstdc++ \
+    && curl -fsSL https://gh.io/copilot-install | PREFIX=/usr/local bash \
     && chmod +x /usr/local/bin/copilot
 
 # Create non-root user
