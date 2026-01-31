@@ -211,8 +211,8 @@ func (o *Orchestrator) validateRequest(req StartRequest) error {
 	if len(req.Models) < 2 {
 		return fmt.Errorf("at least 2 models are required")
 	}
-	if len(req.Models) > 8 {
-		return fmt.Errorf("maximum 8 models allowed")
+	if len(req.Models) > 20 {
+		return fmt.Errorf("maximum 20 models allowed")
 	}
 	if req.Mode == "" {
 		req.Mode = ModeStandard

@@ -335,6 +335,12 @@ func (s *Service) StreamPrompt(ctx context.Context, userID, accessToken, modelID
 		// Track content and completion
 		var fullContent string
 		done := make(chan struct{})
+		var closeOnce sync.Once
+		closeDone := func() {
+			closeOnce.Do(func() {
+				close(done)
+			})
+		}
 
 		// Subscribe to events
 		unsubscribe := session.On(func(event copilot.SessionEvent) {
@@ -369,14 +375,15 @@ func (s *Service) StreamPrompt(ctx context.Context, userID, accessToken, modelID
 				}
 			case "session.idle":
 				// Session finished processing
-				close(done)
+				closeDone()
 			case "session.error":
 				errMsg := "session error"
 				if event.Data.Message != nil {
 					errMsg = *event.Data.Message
 				}
+				log.Printf("[COPILOT] Session error: %s", errMsg)
 				chunks <- StreamChunk{Error: fmt.Errorf("%s", errMsg)}
-				close(done)
+				closeDone()
 			}
 		})
 		defer unsubscribe()

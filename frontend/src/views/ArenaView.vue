@@ -14,6 +14,7 @@ const mode = ref<CouncilMode>('standard')
 const debateRounds = ref(3)
 const enableDevil = ref(false)
 const enableMystery = ref(false)
+const showFullResponses = ref(false)
 
 // Fetch models if not already loaded
 onMounted(() => {
@@ -46,7 +47,7 @@ function toggleModel(modelId: string) {
   const index = selectedModels.value.indexOf(modelId)
   if (index >= 0) {
     selectedModels.value.splice(index, 1)
-  } else if (selectedModels.value.length < 8) {
+  } else if (selectedModels.value.length < 20) {
     selectedModels.value.push(modelId)
   }
 }
@@ -114,7 +115,7 @@ async function submitVote() {
 
       <!-- Model Selection -->
       <div class="card p-4">
-        <h2 class="text-lg font-medium mb-4">{{ t('arena.select_models') }} ({{ selectedModels.length }}/8)</h2>
+        <h2 class="text-lg font-medium mb-4">{{ t('arena.select_models') }} ({{ selectedModels.length }}/20)</h2>
         
         <!-- Loading state -->
         <div v-if="modelsStore.loading" class="text-text-secondary py-4">
@@ -206,25 +207,70 @@ async function submitVote() {
 
     <!-- Active Session -->
     <div v-if="isActive || councilStore.status === 'completed'" class="space-y-6">
+      <!-- Question Display -->
+      <div class="card p-4 border-primary/50">
+        <h3 class="text-sm font-medium text-text-secondary mb-2">Question</h3>
+        <p class="text-lg">{{ question || councilStore.currentSession?.question }}</p>
+      </div>
+
       <!-- Status -->
       <div class="card p-4">
-        <div class="flex items-center gap-2">
-          <div v-if="isActive" class="w-3 h-3 bg-primary rounded-full animate-pulse" />
-          <div v-else class="w-3 h-3 bg-success rounded-full" />
-          <span class="font-medium">
-            {{ councilStore.status === 'responding' ? t('arena.stage_responding') : '' }}
-            {{ councilStore.status === 'voting' ? t('arena.stage_voting') : '' }}
-            {{ councilStore.status === 'synthesizing' ? t('arena.stage_synthesizing') : '' }}
-            {{ councilStore.status === 'completed' ? t('common.success') : '' }}
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div v-if="isActive" class="w-3 h-3 bg-primary rounded-full animate-pulse" />
+            <div v-else class="w-3 h-3 bg-success rounded-full" />
+            <span class="font-medium">
+              {{ councilStore.status === 'pending' ? 'Starting council...' : '' }}
+              {{ councilStore.status === 'responding' ? t('arena.stage_responding') : '' }}
+              {{ councilStore.status === 'voting' ? t('arena.stage_voting') : '' }}
+              {{ councilStore.status === 'synthesizing' ? t('arena.stage_synthesizing') : '' }}
+              {{ councilStore.status === 'completed' ? t('common.success') : '' }}
+            </span>
+          </div>
+          <span v-if="councilStore.status === 'responding'" class="text-sm text-text-secondary">
+            {{ councilStore.anonymizedResponses.filter(r => !r.isStreaming).length }} / {{ councilStore.anonymizedResponses.length }} complete
           </span>
         </div>
       </div>
 
-      <!-- Responses -->
-      <div class="space-y-4">
+      <!-- Responses Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div
           v-for="response in councilStore.anonymizedResponses"
           :key="response.label"
+          class="card p-4 flex flex-col"
+          :class="{ 'border-primary/50': response.isStreaming }"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-medium text-primary">{{ response.label }}</span>
+            <span v-if="response.isStreaming" class="flex items-center gap-1 text-xs text-primary">
+              <span class="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+              thinking...
+            </span>
+            <span v-else class="text-xs text-text-muted">
+              ✓ complete
+            </span>
+          </div>
+          <div class="prose prose-invert max-w-none flex-1 overflow-auto max-h-64">
+            <p class="whitespace-pre-wrap text-sm">{{ response.content || '...' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Show expand button if responses exist -->
+      <button
+        v-if="councilStore.anonymizedResponses.length > 0"
+        @click="showFullResponses = !showFullResponses"
+        class="btn btn-ghost w-full"
+      >
+        {{ showFullResponses ? 'Collapse responses' : 'Expand all responses' }}
+      </button>
+
+      <!-- Full Responses (expanded view) -->
+      <div v-if="showFullResponses" class="space-y-4">
+        <div
+          v-for="response in councilStore.anonymizedResponses"
+          :key="'full-' + response.label"
           class="card p-4"
         >
           <div class="flex items-center justify-between mb-2">
