@@ -40,6 +40,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o council ./cmd/council
 # Stage 3: Final image (using Debian for glibc compatibility with Copilot CLI)
 FROM debian:bookworm-slim
 
+# Create non-root user with home directory (required for Copilot CLI)
+RUN groupadd --system council && useradd --system --gid council --create-home council
+
 # Install runtime dependencies and GitHub Copilot CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata git curl wget \
@@ -47,22 +50,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://gh.io/copilot-install | bash \
     && copilot --version
 
-# Create non-root user
-RUN groupadd --system council && useradd --system --gid council council
-
 WORKDIR /app
 
 # Copy built artifacts
 COPY --from=backend-builder /app/council .
 COPY --from=frontend-builder /app/frontend/dist ./static
 
-# Create data directory
-RUN mkdir -p /data && chown -R council:council /data /app
+# Create data directory and ensure council user owns copilot directory
+RUN mkdir -p /data && chown -R council:council /data /app /home/council
 
 # Switch to non-root user
 USER council
 
 # Environment defaults
+ENV HOME=/home/council
 ENV DATABASE_PATH=/data/council.db
 ENV PORT=8080
 ENV ENV=production
