@@ -33,11 +33,10 @@ type StreamChunk struct {
 
 // Service manages Copilot SDK interactions
 type Service struct {
-	models      []Model
-	modelsCache time.Time
-	cacheTTL    time.Duration
-	mu          sync.RWMutex
-	shutdown    chan struct{}
+	models   []Model
+	cacheTTL time.Duration
+	mu       sync.RWMutex
+	shutdown chan struct{}
 }
 
 // NewService creates a new Copilot service
@@ -163,6 +162,7 @@ Here are the anonymized responses:
 	}
 
 	prompt += `Please rank these responses from best to worst. Return ONLY a comma-separated list of labels in order from best to worst (e.g., "Response B, Response A, Response C").`
+	_ = prompt // Will be used when Copilot SDK is integrated
 
 	// TODO: Integrate with actual Copilot SDK
 	// For now, return a placeholder ranking

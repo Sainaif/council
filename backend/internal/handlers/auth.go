@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -88,6 +89,7 @@ func (h *AuthHandler) Callback(c *fiber.Ctx) error {
 	`, user.ID, user.Login, user.AvatarURL, user.Login, user.AvatarURL)
 	if err != nil {
 		// Log but don't fail - user can still use the app
+		log.Printf("Failed to update user preferences: %v", err)
 	}
 
 	// Create JWT token

@@ -230,12 +230,13 @@ func (c *Calculator) updateModelRating(tx *sql.Tx, modelID string, categoryID *i
 }
 
 func (c *Calculator) recordHistory(tx *sql.Tx, modelID string, categoryID *int64, sessionID string, oldRating, newRating, change int) error {
-	reason := "council_vote"
-	if change > 0 {
+	var reason string
+	switch {
+	case change > 0:
 		reason = "win"
-	} else if change < 0 {
+	case change < 0:
 		reason = "loss"
-	} else {
+	default:
 		reason = "draw"
 	}
 
@@ -254,11 +255,12 @@ func (c *Calculator) UpdateMatchup(tx *sql.Tx, modelA, modelB string, categoryID
 	}
 
 	var aWins, bWins, draws int
-	if winnerID == modelA {
+	switch winnerID {
+	case modelA:
 		aWins = 1
-	} else if winnerID == modelB {
+	case modelB:
 		bWins = 1
-	} else {
+	default:
 		draws = 1
 	}
 

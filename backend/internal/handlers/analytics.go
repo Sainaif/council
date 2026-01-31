@@ -21,42 +21,42 @@ func (h *AnalyticsHandler) Overview(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
 	type Overview struct {
-		TotalSessions   int     `json:"total_sessions"`
-		CompletedCount  int     `json:"completed_count"`
-		AverageModels   float64 `json:"average_models_per_session"`
-		MostUsedModel   string  `json:"most_used_model"`
-		TopPerformer    string  `json:"top_performer"`
-		TotalVotes      int     `json:"total_votes"`
-		SessionsToday   int     `json:"sessions_today"`
-		SessionsThisWeek int    `json:"sessions_this_week"`
+		TotalSessions    int     `json:"total_sessions"`
+		CompletedCount   int     `json:"completed_count"`
+		AverageModels    float64 `json:"average_models_per_session"`
+		MostUsedModel    string  `json:"most_used_model"`
+		TopPerformer     string  `json:"top_performer"`
+		TotalVotes       int     `json:"total_votes"`
+		SessionsToday    int     `json:"sessions_today"`
+		SessionsThisWeek int     `json:"sessions_this_week"`
 	}
 
 	var overview Overview
 
 	// Total sessions for user
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(*) FROM sessions WHERE user_id = ?
 	`, userID).Scan(&overview.TotalSessions)
 
 	// Completed sessions
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(*) FROM sessions WHERE user_id = ? AND status = 'completed'
 	`, userID).Scan(&overview.CompletedCount)
 
 	// Sessions today
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(*) FROM sessions
 		WHERE user_id = ? AND date(created_at) = date('now')
 	`, userID).Scan(&overview.SessionsToday)
 
 	// Sessions this week
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(*) FROM sessions
 		WHERE user_id = ? AND created_at > datetime('now', '-7 days')
 	`, userID).Scan(&overview.SessionsThisWeek)
 
 	// Average models per session
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COALESCE(AVG(model_count), 0) FROM (
 			SELECT session_id, COUNT(DISTINCT model_id) as model_count
 			FROM responses r
@@ -68,7 +68,7 @@ func (h *AnalyticsHandler) Overview(c *fiber.Ctx) error {
 
 	// Most used model
 	var mostUsed sql.NullString
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT model_id FROM responses r
 		JOIN sessions s ON r.session_id = s.id
 		WHERE s.user_id = ?
@@ -82,7 +82,7 @@ func (h *AnalyticsHandler) Overview(c *fiber.Ctx) error {
 
 	// Top performer (highest ELO)
 	var topPerformer sql.NullString
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT m.id FROM models m
 		LEFT JOIN model_ratings mr ON m.id = mr.model_id
 		GROUP BY m.id
@@ -94,16 +94,16 @@ func (h *AnalyticsHandler) Overview(c *fiber.Ctx) error {
 	}
 
 	// Total votes by user
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(*) FROM votes WHERE voter_type = 'user' AND voter_id = ?
 	`, userID).Scan(&overview.TotalVotes)
 
 	// Model performance trends
 	type ModelTrend struct {
-		ModelID     string `json:"model_id"`
-		DisplayName string `json:"display_name"`
-		Rating      int    `json:"rating"`
-		Trend7d     int    `json:"trend_7d"`
+		ModelID     string  `json:"model_id"`
+		DisplayName string  `json:"display_name"`
+		Rating      int     `json:"rating"`
+		Trend7d     int     `json:"trend_7d"`
 		WinRate     float64 `json:"win_rate"`
 	}
 
@@ -122,18 +122,18 @@ func (h *AnalyticsHandler) Overview(c *fiber.Ctx) error {
 		LIMIT 10
 	`)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var t ModelTrend
 			var wins, losses int
-			rows.Scan(&t.ModelID, &t.DisplayName, &t.Rating, &wins, &losses)
+			_ = rows.Scan(&t.ModelID, &t.DisplayName, &t.Rating, &wins, &losses)
 			if wins+losses > 0 {
 				t.WinRate = float64(wins) / float64(wins+losses)
 			}
 
 			// Get 7-day trend
 			var trend sql.NullInt64
-			h.db.QueryRow(`
+			_ = h.db.QueryRow(`
 				SELECT SUM(change) FROM elo_history
 				WHERE model_id = ? AND created_at > datetime('now', '-7 days')
 			`, t.ModelID).Scan(&trend)
@@ -161,17 +161,17 @@ func (h *AnalyticsHandler) Overview(c *fiber.Ctx) error {
 		ORDER BY session_count DESC
 	`, userID)
 	if err == nil {
-		defer catRows.Close()
+		defer func() { _ = catRows.Close() }()
 		for catRows.Next() {
 			var cd CategoryDist
-			catRows.Scan(&cd.CategoryID, &cd.CategoryName, &cd.SessionCount)
+			_ = catRows.Scan(&cd.CategoryID, &cd.CategoryName, &cd.SessionCount)
 			categoryDist = append(categoryDist, cd)
 		}
 	}
 
 	return c.JSON(fiber.Map{
-		"overview":        overview,
-		"model_trends":    trends,
+		"overview":              overview,
+		"model_trends":          trends,
 		"category_distribution": categoryDist,
 	})
 }
@@ -218,11 +218,11 @@ func (h *AnalyticsHandler) UserBias(c *fiber.Ctx) error {
 			"message": "Failed to analyze user bias",
 		})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var p ModelPreference
-		rows.Scan(&p.ModelID, &p.DisplayName, &p.TimesVotedFor, &p.TotalVotes)
+		_ = rows.Scan(&p.ModelID, &p.DisplayName, &p.TimesVotedFor, &p.TotalVotes)
 		if p.TotalVotes > 0 {
 			p.Preference = float64(p.TimesVotedFor) / float64(p.TotalVotes)
 		}
@@ -238,8 +238,8 @@ func (h *AnalyticsHandler) UserBias(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"preferences":   preferences,
-		"bias_warning":  biasWarning,
+		"preferences":  preferences,
+		"bias_warning": biasWarning,
 	})
 }
 
@@ -258,7 +258,7 @@ func (h *AnalyticsHandler) Costs(c *fiber.Ctx) error {
 	var summary CostSummary
 
 	// Total tokens
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COALESCE(SUM(r.token_count), 0), COUNT(DISTINCT r.session_id)
 		FROM responses r
 		JOIN sessions s ON r.session_id = s.id
@@ -270,7 +270,7 @@ func (h *AnalyticsHandler) Costs(c *fiber.Ctx) error {
 	}
 
 	// Tokens today
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COALESCE(SUM(r.token_count), 0)
 		FROM responses r
 		JOIN sessions s ON r.session_id = s.id
@@ -278,7 +278,7 @@ func (h *AnalyticsHandler) Costs(c *fiber.Ctx) error {
 	`, userID).Scan(&summary.TokensToday)
 
 	// Tokens this week
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COALESCE(SUM(r.token_count), 0)
 		FROM responses r
 		JOIN sessions s ON r.session_id = s.id
@@ -286,7 +286,7 @@ func (h *AnalyticsHandler) Costs(c *fiber.Ctx) error {
 	`, userID).Scan(&summary.TokensThisWeek)
 
 	// Tokens this month
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COALESCE(SUM(r.token_count), 0)
 		FROM responses r
 		JOIN sessions s ON r.session_id = s.id
@@ -312,10 +312,10 @@ func (h *AnalyticsHandler) Costs(c *fiber.Ctx) error {
 		ORDER BY SUM(r.token_count) DESC
 	`, userID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var mu ModelUsage
-			rows.Scan(&mu.ModelID, &mu.DisplayName, &mu.TokenCount, &mu.Requests)
+			_ = rows.Scan(&mu.ModelID, &mu.DisplayName, &mu.TokenCount, &mu.Requests)
 			modelUsage = append(modelUsage, mu)
 		}
 	}
@@ -337,17 +337,17 @@ func (h *AnalyticsHandler) Costs(c *fiber.Ctx) error {
 		ORDER BY day DESC
 	`, userID)
 	if err == nil {
-		defer dailyRows.Close()
+		defer func() { _ = dailyRows.Close() }()
 		for dailyRows.Next() {
 			var du DailyUsage
-			dailyRows.Scan(&du.Date, &du.TokenCount, &du.Sessions)
+			_ = dailyRows.Scan(&du.Date, &du.TokenCount, &du.Sessions)
 			dailyUsage = append(dailyUsage, du)
 		}
 	}
 
 	return c.JSON(fiber.Map{
-		"summary":      summary,
-		"by_model":     modelUsage,
-		"daily_usage":  dailyUsage,
+		"summary":     summary,
+		"by_model":    modelUsage,
+		"daily_usage": dailyUsage,
 	})
 }

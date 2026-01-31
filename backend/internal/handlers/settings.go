@@ -63,10 +63,10 @@ func (h *SettingsHandler) Get(c *fiber.Ctx) error {
 	}
 
 	if defaultModels.Valid {
-		json.Unmarshal([]byte(defaultModels.String), &settings.DefaultModels)
+		_ = json.Unmarshal([]byte(defaultModels.String), &settings.DefaultModels)
 	}
 	if preferredCategories.Valid {
-		json.Unmarshal([]byte(preferredCategories.String), &settings.PreferredCategories)
+		_ = json.Unmarshal([]byte(preferredCategories.String), &settings.PreferredCategories)
 	}
 	if autoSave.Valid {
 		settings.AutoSaveSessions = autoSave.Bool

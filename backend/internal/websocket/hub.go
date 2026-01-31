@@ -117,7 +117,7 @@ func (h *Hub) HandleConnection(c *websocket.Conn, sessionID string) {
 	// Writer goroutine
 	go func() {
 		defer func() {
-			c.Close()
+			_ = c.Close()
 		}()
 		for message := range client.Send {
 			if err := c.WriteMessage(websocket.TextMessage, message); err != nil {
@@ -129,7 +129,7 @@ func (h *Hub) HandleConnection(c *websocket.Conn, sessionID string) {
 	// Reader goroutine (mainly for keeping connection alive)
 	defer func() {
 		h.unregister <- client
-		c.Close()
+		_ = c.Close()
 	}()
 
 	for {

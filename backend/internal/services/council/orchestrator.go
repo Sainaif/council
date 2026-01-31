@@ -102,7 +102,6 @@ type Orchestrator struct {
 	copilot *copilot.Service
 	elo     *elo.Calculator
 	hub     *websocket.Hub
-	mu      sync.RWMutex
 }
 
 func NewOrchestrator(db *database.DB, copilot *copilot.Service, elo *elo.Calculator, hub *websocket.Hub) *Orchestrator {
@@ -272,7 +271,7 @@ func (o *Orchestrator) executeStandardMode(ctx context.Context, session *Session
 	for _, vote := range votes {
 		rankings[vote.VoterID] = vote.RankedResponses
 	}
-	o.elo.UpdateRatings(session.ID, session.CategoryID, rankings)
+	_, _ = o.elo.UpdateRatings(session.ID, session.CategoryID, rankings)
 
 	// Complete session
 	o.completeSession(session.ID)
@@ -561,18 +560,18 @@ func (o *Orchestrator) synthesize(ctx context.Context, session *Session, respons
 }
 
 func (o *Orchestrator) updateSessionStatus(sessionID string, status SessionStatus) {
-	o.db.Exec(`UPDATE sessions SET status = ? WHERE id = ?`, status, sessionID)
+	_, _ = o.db.Exec(`UPDATE sessions SET status = ? WHERE id = ?`, status, sessionID)
 }
 
 func (o *Orchestrator) failSession(sessionID, reason string) {
-	o.db.Exec(`UPDATE sessions SET status = ? WHERE id = ?`, StatusFailed, sessionID)
+	_, _ = o.db.Exec(`UPDATE sessions SET status = ? WHERE id = ?`, StatusFailed, sessionID)
 	o.hub.Broadcast(sessionID, websocket.EventCouncilFailed, map[string]string{
 		"reason": reason,
 	})
 }
 
 func (o *Orchestrator) completeSession(sessionID string) {
-	o.db.Exec(`UPDATE sessions SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`, StatusCompleted, sessionID)
+	_, _ = o.db.Exec(`UPDATE sessions SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`, StatusCompleted, sessionID)
 	o.hub.Broadcast(sessionID, websocket.EventCouncilCompleted, nil)
 }
 
@@ -619,7 +618,7 @@ func (o *Orchestrator) GetSession(ctx context.Context, sessionID string) (*Sessi
 		session.CompletedAt = &completedAt.Time
 	}
 	if configJSON.Valid {
-		json.Unmarshal([]byte(configJSON.String), &session.Config)
+		_ = json.Unmarshal([]byte(configJSON.String), &session.Config)
 	}
 
 	// Load responses
@@ -628,10 +627,10 @@ func (o *Orchestrator) GetSession(ctx context.Context, sessionID string) (*Sessi
 		FROM responses WHERE session_id = ? ORDER BY round, id
 	`, sessionID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var r Response
-			rows.Scan(&r.ID, &r.SessionID, &r.ModelID, &r.Round, &r.Content,
+			_ = rows.Scan(&r.ID, &r.SessionID, &r.ModelID, &r.Round, &r.Content,
 				&r.AnonymousLabel, &r.ResponseTimeMs, &r.TokenCount, &r.CreatedAt)
 			session.Responses = append(session.Responses, r)
 		}
@@ -643,12 +642,12 @@ func (o *Orchestrator) GetSession(ctx context.Context, sessionID string) (*Sessi
 		FROM votes WHERE session_id = ?
 	`, sessionID)
 	if err == nil {
-		defer voteRows.Close()
+		defer func() { _ = voteRows.Close() }()
 		for voteRows.Next() {
 			var v Vote
 			var rankedJSON string
-			voteRows.Scan(&v.ID, &v.SessionID, &v.VoterType, &v.VoterID, &rankedJSON, &v.Weight, &v.CreatedAt)
-			json.Unmarshal([]byte(rankedJSON), &v.RankedResponses)
+			_ = voteRows.Scan(&v.ID, &v.SessionID, &v.VoterType, &v.VoterID, &rankedJSON, &v.Weight, &v.CreatedAt)
+			_ = json.Unmarshal([]byte(rankedJSON), &v.RankedResponses)
 			session.Votes = append(session.Votes, v)
 		}
 	}
