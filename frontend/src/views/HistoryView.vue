@@ -33,7 +33,7 @@ async function viewSession(session: any) {
     selectedSession.value = response.data
     // Expand all rounds by default
     if (selectedSession.value?.responses) {
-      const rounds = new Set(selectedSession.value.responses.map((r: any) => r.round))
+      const rounds = new Set(selectedSession.value.responses.map((r: any) => r.round as number))
       expandedRounds.value = rounds
     }
   } catch (e) {
@@ -250,7 +250,7 @@ onMounted(fetchHistory)
           <p class="text-sm text-text-secondary mb-4">See which model was behind each response</p>
           <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
             <div
-              v-for="response in [...new Map(selectedSession.responses.map((r: any) => [r.anonymous_label, r])).values()]"
+              v-for="response in ([...new Map(selectedSession.responses.map((r: any) => [r.anonymous_label, r])).values()] as any[])"
               :key="response.anonymous_label"
               class="flex items-center gap-2 p-2 bg-surface rounded"
             >
