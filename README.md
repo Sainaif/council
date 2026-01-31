@@ -16,7 +16,7 @@ Self-hosted web application for orchestrating LLM council discussions using GitH
 ### Prerequisites
 
 - Docker and Docker Compose
-- GitHub account with Copilot subscription
+- GitHub account with **GitHub Copilot subscription** (required for AI model access)
 
 ### Using Prebuilt Image (Recommended)
 
@@ -74,10 +74,10 @@ All configuration is done via environment variables. See [.env.example](.env.exa
 
 ### Requirements
 
-- Go 1.25+
-- Node.js 25+
+- Go 1.24+
+- Node.js 20+
 - GitHub OAuth app configured
-- GitHub Copilot subscription
+- **GitHub Copilot subscription** (your OAuth login is used for Copilot access)
 
 ### Setup
 

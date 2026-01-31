@@ -36,7 +36,7 @@ func (h *RankingHandler) Global(c *fiber.Ctx) error {
 		limit = 100
 	}
 
-	var rankings []RankingEntry
+	rankings := make([]RankingEntry, 0) // Initialize as empty slice, not nil
 	rows, err := h.db.Query(`
 		SELECT
 			m.id, m.display_name, m.provider,

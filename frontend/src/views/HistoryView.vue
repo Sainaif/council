@@ -12,10 +12,10 @@ const selectedSession = ref<any>(null)
 async function fetchHistory() {
   loading.value = true
   try {
-    // Note: This endpoint would need to be added to backend
     const response = await api.get('/api/council/history')
-    sessions.value = response.data
+    sessions.value = Array.isArray(response.data) ? response.data : []
   } catch (e) {
+    console.error('Failed to fetch history', e)
     sessions.value = []
   } finally {
     loading.value = false

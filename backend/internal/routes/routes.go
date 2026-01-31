@@ -36,6 +36,7 @@ func Setup(app *fiber.App, h Handlers, authMw *middleware.AuthMiddleware, wsHub 
 
 	// Council routes
 	council := api.Group("/council")
+	council.Get("/history", h.Council.History) // Must be before /:id to avoid conflict
 	council.Post("/start", h.Council.Start)
 	council.Get("/:id", h.Council.Get)
 	council.Post("/:id/vote", h.Council.Vote)

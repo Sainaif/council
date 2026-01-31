@@ -40,8 +40,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o council ./cmd/council
 # Stage 3: Final image
 FROM alpine:3.23
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+# Install runtime dependencies including GitHub CLI for Copilot
+RUN apk add --no-cache ca-certificates tzdata git curl bash \
+    && curl -sL https://github.com/cli/cli/releases/download/v2.77.0/gh_2.77.0_linux_amd64.tar.gz | tar xz -C /tmp \
+    && mv /tmp/gh_2.77.0_linux_amd64/bin/gh /usr/local/bin/ \
+    && rm -rf /tmp/gh_2.77.0_linux_amd64 \
+    && chmod +x /usr/local/bin/gh
 
 # Create non-root user
 RUN addgroup -S council && adduser -S council -G council
@@ -52,16 +56,21 @@ WORKDIR /app
 COPY --from=backend-builder /app/council .
 COPY --from=frontend-builder /app/frontend/dist ./static
 
-# Create data directory
+# Create data directory and set up Copilot CLI
 RUN mkdir -p /data && chown -R council:council /data /app
 
 # Switch to non-root user
 USER council
 
+# Install GitHub Copilot extension (requires gh to be available)
+RUN gh extension install github-copilot || true
+
 # Environment defaults
 ENV DATABASE_PATH=/data/council.db
 ENV PORT=8080
 ENV ENV=production
+# GitHub token should be provided at runtime for Copilot authentication
+# ENV GITHUB_TOKEN=
 
 EXPOSE 8080
 

@@ -29,9 +29,10 @@ type GitHubAuth struct {
 }
 
 type Claims struct {
-	UserID    string `json:"user_id"`
-	Username  string `json:"username"`
-	AvatarURL string `json:"avatar_url"`
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	AvatarURL   string `json:"avatar_url"`
+	AccessToken string `json:"access_token"` // GitHub OAuth token for Copilot SDK
 	jwt.RegisteredClaims
 }
 
@@ -40,7 +41,7 @@ func NewGitHubAuth(cfg *config.Config) *GitHubAuth {
 		config: &oauth2.Config{
 			ClientID:     cfg.GitHubClientID,
 			ClientSecret: cfg.GitHubClientSecret,
-			Scopes:       []string{"read:user", "user:email"},
+			Scopes:       []string{"read:user", "user:email", "copilot"}, // copilot scope for Copilot SDK
 			Endpoint:     github.Endpoint,
 			RedirectURL:  cfg.OAuthCallbackURL(),
 		},
@@ -78,11 +79,12 @@ func (g *GitHubAuth) GetUser(ctx context.Context, token *oauth2.Token) (*GitHubU
 	return &user, nil
 }
 
-func (g *GitHubAuth) CreateToken(user *GitHubUser) (string, error) {
+func (g *GitHubAuth) CreateToken(user *GitHubUser, accessToken string) (string, error) {
 	claims := &Claims{
-		UserID:    fmt.Sprintf("%d", user.ID),
-		Username:  user.Login,
-		AvatarURL: user.AvatarURL,
+		UserID:      fmt.Sprintf("%d", user.ID),
+		Username:    user.Login,
+		AvatarURL:   user.AvatarURL,
+		AccessToken: accessToken, // Store OAuth token for Copilot SDK
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(g.tokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

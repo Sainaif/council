@@ -6,6 +6,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	copilot "github.com/github/copilot-sdk/go"
 )
 
 // Model represents an available AI model
@@ -32,118 +34,361 @@ type StreamChunk struct {
 	Error      error  `json:"error,omitempty"`
 }
 
-// Service manages Copilot SDK interactions
+// userClient holds a Copilot client for a specific user
+type userClient struct {
+	client    *copilot.Client
+	createdAt time.Time
+	lastUsed  time.Time
+}
+
+// Service manages Copilot SDK interactions with per-user authentication
 type Service struct {
-	models   []Model
-	cacheTTL time.Duration
-	mu       sync.RWMutex
-	shutdown chan struct{}
+	clients     map[string]*userClient // key: userID
+	clientsMu   sync.RWMutex
+	modelsCache map[string][]Model // key: userID
+	modelsMu    sync.RWMutex
+	cacheTTL    time.Duration
+	shutdown    chan struct{}
+	cleanupDone chan struct{}
 }
 
 // NewService creates a new Copilot service
 func NewService() *Service {
 	s := &Service{
-		cacheTTL: 5 * time.Minute,
-		shutdown: make(chan struct{}),
+		clients:     make(map[string]*userClient),
+		modelsCache: make(map[string][]Model),
+		cacheTTL:    5 * time.Minute,
+		shutdown:    make(chan struct{}),
+		cleanupDone: make(chan struct{}),
 	}
 
-	// Initialize with default models (these would come from Copilot SDK in production)
-	s.models = getDefaultModels()
+	// Start background cleanup goroutine
+	go s.cleanupLoop()
 
 	return s
 }
 
-// getDefaultModels returns a list of available models
-// In production, this would query the Copilot SDK
-func getDefaultModels() []Model {
-	return []Model{
-		{ID: "gpt-4o", DisplayName: "GPT-4o", Provider: "openai", Capabilities: []string{"chat", "code", "reasoning"}},
-		{ID: "gpt-4o-mini", DisplayName: "GPT-4o Mini", Provider: "openai", Capabilities: []string{"chat", "code"}},
-		{ID: "claude-sonnet-4", DisplayName: "Claude Sonnet 4", Provider: "anthropic", Capabilities: []string{"chat", "code", "reasoning"}},
-		{ID: "claude-3.5-sonnet", DisplayName: "Claude 3.5 Sonnet", Provider: "anthropic", Capabilities: []string{"chat", "code", "reasoning"}},
-		{ID: "gemini-2.0-flash", DisplayName: "Gemini 2.0 Flash", Provider: "google", Capabilities: []string{"chat", "code"}},
-		{ID: "o1", DisplayName: "o1", Provider: "openai", Capabilities: []string{"reasoning", "code"}},
-		{ID: "o1-mini", DisplayName: "o1 Mini", Provider: "openai", Capabilities: []string{"reasoning"}},
-		{ID: "o3-mini", DisplayName: "o3 Mini", Provider: "openai", Capabilities: []string{"reasoning", "code"}},
+// cleanupLoop periodically cleans up idle clients
+func (s *Service) cleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	defer close(s.cleanupDone)
+
+	for {
+		select {
+		case <-ticker.C:
+			s.cleanupIdleClients()
+		case <-s.shutdown:
+			return
+		}
 	}
 }
 
-// ListModels returns available models
-func (s *Service) ListModels(ctx context.Context) ([]Model, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+// cleanupIdleClients removes clients that haven't been used recently
+func (s *Service) cleanupIdleClients() {
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
 
-	return s.models, nil
+	threshold := time.Now().Add(-30 * time.Minute)
+	for userID, uc := range s.clients {
+		if uc.lastUsed.Before(threshold) {
+			log.Printf("[COPILOT] Cleaning up idle client for user: %s", userID)
+			uc.client.Stop()
+			delete(s.clients, userID)
+		}
+	}
+}
+
+// getOrCreateClient gets or creates a Copilot client for a user
+func (s *Service) getOrCreateClient(userID, accessToken string) (*copilot.Client, error) {
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
+
+	// Check if client exists and is still valid
+	if uc, exists := s.clients[userID]; exists {
+		uc.lastUsed = time.Now()
+		return uc.client, nil
+	}
+
+	// Create new client with user's token
+	log.Printf("[COPILOT] Creating new client for user: %s", userID)
+
+	opts := &copilot.ClientOptions{
+		LogLevel:    getLogLevel(),
+		AutoStart:   copilot.Bool(true),
+		AutoRestart: copilot.Bool(true),
+		GithubToken: accessToken,
+	}
+
+	client := copilot.NewClient(opts)
+
+	if err := client.Start(); err != nil {
+		log.Printf("[COPILOT] ERROR: Failed to start client for user %s: %v", userID, err)
+		return nil, fmt.Errorf("failed to start Copilot client: %w", err)
+	}
+
+	s.clients[userID] = &userClient{
+		client:    client,
+		createdAt: time.Now(),
+		lastUsed:  time.Now(),
+	}
+
+	log.Printf("[COPILOT] Client created successfully for user: %s", userID)
+	return client, nil
+}
+
+// getLogLevel returns the appropriate log level based on environment
+func getLogLevel() string {
+	// Could read from config, default to error
+	return "error"
+}
+
+// ListModels returns available models for a user (dynamically fetched from Copilot)
+func (s *Service) ListModels(ctx context.Context, userID, accessToken string) ([]Model, error) {
+	// Check cache first
+	s.modelsMu.RLock()
+	if cached, exists := s.modelsCache[userID]; exists {
+		s.modelsMu.RUnlock()
+		return cached, nil
+	}
+	s.modelsMu.RUnlock()
+
+	// Get or create client
+	client, err := s.getOrCreateClient(userID, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch models from SDK
+	log.Printf("[COPILOT] Fetching models for user: %s", userID)
+	modelInfos, err := client.ListModels()
+	if err != nil {
+		log.Printf("[COPILOT] ERROR: Failed to list models for user %s: %v", userID, err)
+		return nil, fmt.Errorf("failed to list models: %w", err)
+	}
+
+	// Convert to our Model type
+	models := make([]Model, 0, len(modelInfos))
+	for _, m := range modelInfos {
+		capabilities := []string{"chat"}
+		// Check if this model likely supports reasoning based on name
+		if contains(m.ID, "o1", "o3", "o4") {
+			capabilities = append(capabilities, "reasoning")
+		}
+
+		models = append(models, Model{
+			ID:           m.ID,
+			DisplayName:  m.Name,
+			Provider:     inferProvider(m.ID),
+			Capabilities: capabilities,
+		})
+	}
+
+	// Cache the results
+	s.modelsMu.Lock()
+	s.modelsCache[userID] = models
+	s.modelsMu.Unlock()
+
+	// Schedule cache expiration
+	go func() {
+		time.Sleep(s.cacheTTL)
+		s.modelsMu.Lock()
+		delete(s.modelsCache, userID)
+		s.modelsMu.Unlock()
+	}()
+
+	log.Printf("[COPILOT] Loaded %d models for user: %s", len(models), userID)
+	return models, nil
+}
+
+// inferProvider determines the provider from model ID
+func inferProvider(modelID string) string {
+	switch {
+	case contains(modelID, "gpt", "o1", "o3", "o4"):
+		return "openai"
+	case contains(modelID, "claude"):
+		return "anthropic"
+	case contains(modelID, "gemini"):
+		return "google"
+	default:
+		return "unknown"
+	}
+}
+
+// contains checks if any of the substrings are in the string
+func contains(s string, substrs ...string) bool {
+	for _, substr := range substrs {
+		if len(s) >= len(substr) {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // GetModel returns a specific model by ID
-func (s *Service) GetModel(ctx context.Context, id string) (*Model, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *Service) GetModel(ctx context.Context, userID, accessToken, modelID string) (*Model, error) {
+	models, err := s.ListModels(ctx, userID, accessToken)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, m := range s.models {
-		if m.ID == id {
+	for _, m := range models {
+		if m.ID == modelID {
 			return &m, nil
 		}
 	}
 
-	return nil, fmt.Errorf("model not found: %s", id)
+	return nil, fmt.Errorf("model not found: %s", modelID)
 }
 
 // SendPrompt sends a prompt to a model and returns the full response
-func (s *Service) SendPrompt(ctx context.Context, modelID, prompt string) (*Response, error) {
-	log.Printf("[COPILOT] SendPrompt - model: %s, prompt length: %d chars", modelID, len(prompt))
+func (s *Service) SendPrompt(ctx context.Context, userID, accessToken, modelID, prompt string) (*Response, error) {
+	log.Printf("[COPILOT] SendPrompt - user: %s, model: %s, prompt length: %d chars", userID, modelID, len(prompt))
 	start := time.Now()
 
-	// TODO: Integrate with actual Copilot SDK
-	// For now, return a placeholder response
+	client, err := s.getOrCreateClient(userID, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a session for this request
+	session, err := client.CreateSession(&copilot.SessionConfig{
+		Model: modelID,
+	})
+	if err != nil {
+		log.Printf("[COPILOT] ERROR: Failed to create session: %v", err)
+		return nil, fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Destroy()
+
+	// Send the message and wait for response
+	resp, err := session.SendAndWait(copilot.MessageOptions{
+		Prompt: prompt,
+	}, time.Duration(120)*time.Second) // 2 minute timeout
+
+	if err != nil {
+		log.Printf("[COPILOT] ERROR: Failed to send prompt: %v", err)
+		return nil, fmt.Errorf("failed to send prompt: %w", err)
+	}
+
+	content := ""
+	if resp != nil && resp.Data.Content != nil {
+		content = *resp.Data.Content
+	}
+
 	response := &Response{
-		Content:      fmt.Sprintf("[Response from %s] This is a placeholder response. The Copilot SDK integration will provide actual model responses.", modelID),
-		TokenCount:   100,
+		Content:      content,
+		TokenCount:   estimateTokenCount(content),
 		ResponseTime: time.Since(start).Milliseconds(),
 	}
 
-	log.Printf("[COPILOT] SendPrompt completed - model: %s, response time: %dms", modelID, response.ResponseTime)
+	log.Printf("[COPILOT] SendPrompt completed - user: %s, model: %s, response time: %dms, content length: %d",
+		userID, modelID, response.ResponseTime, len(content))
 	return response, nil
 }
 
 // StreamPrompt sends a prompt and streams the response
-func (s *Service) StreamPrompt(ctx context.Context, modelID, prompt string) (<-chan StreamChunk, error) {
-	log.Printf("[COPILOT] StreamPrompt - model: %s, prompt length: %d chars", modelID, len(prompt))
+func (s *Service) StreamPrompt(ctx context.Context, userID, accessToken, modelID, prompt string) (<-chan StreamChunk, error) {
+	log.Printf("[COPILOT] StreamPrompt - user: %s, model: %s, prompt length: %d chars", userID, modelID, len(prompt))
 	chunks := make(chan StreamChunk, 100)
+
+	client, err := s.getOrCreateClient(userID, accessToken)
+	if err != nil {
+		close(chunks)
+		return nil, err
+	}
 
 	go func() {
 		defer close(chunks)
 
-		// TODO: Integrate with actual Copilot SDK for streaming
-		// For now, simulate streaming with placeholder
-		words := []string{
-			"[Response", "from", modelID + "]",
-			"This", "is", "a", "placeholder", "streaming", "response.",
-			"The", "Copilot", "SDK", "integration", "will", "provide",
-			"actual", "model", "responses", "with", "real", "streaming.",
+		// Create a session with streaming enabled
+		session, err := client.CreateSession(&copilot.SessionConfig{
+			Model:     modelID,
+			Streaming: true,
+		})
+		if err != nil {
+			log.Printf("[COPILOT] ERROR: Failed to create streaming session: %v", err)
+			chunks <- StreamChunk{Error: err}
+			return
 		}
+		defer session.Destroy()
 
-		for i, word := range words {
+		// Track content and completion
+		var fullContent string
+		done := make(chan struct{})
+
+		// Subscribe to events
+		unsubscribe := session.On(func(event copilot.SessionEvent) {
 			select {
 			case <-ctx.Done():
-				chunks <- StreamChunk{Error: ctx.Err()}
 				return
 			case <-s.shutdown:
 				return
 			default:
-				chunks <- StreamChunk{
-					Content: word + " ",
-					Done:    i == len(words)-1,
-				}
-				time.Sleep(50 * time.Millisecond) // Simulate streaming delay
 			}
+
+			switch event.Type {
+			case "assistant.message_delta":
+				if event.Data.DeltaContent != nil {
+					deltaContent := *event.Data.DeltaContent
+					fullContent += deltaContent
+					chunks <- StreamChunk{
+						Content: deltaContent,
+						Done:    false,
+					}
+				}
+			case "assistant.message":
+				// Final message received
+				if event.Data.Content != nil {
+					// Only send if we didn't already stream it
+					if fullContent == "" {
+						chunks <- StreamChunk{
+							Content: *event.Data.Content,
+							Done:    true,
+						}
+					}
+				}
+			case "session.idle":
+				// Session finished processing
+				close(done)
+			case "session.error":
+				errMsg := "session error"
+				if event.Data.Message != nil {
+					errMsg = *event.Data.Message
+				}
+				chunks <- StreamChunk{Error: fmt.Errorf("%s", errMsg)}
+				close(done)
+			}
+		})
+		defer unsubscribe()
+
+		// Send the message
+		_, err = session.Send(copilot.MessageOptions{
+			Prompt: prompt,
+		})
+		if err != nil {
+			log.Printf("[COPILOT] ERROR: Failed to send streaming prompt: %v", err)
+			chunks <- StreamChunk{Error: err}
+			return
 		}
 
-		// Final chunk with token count
-		chunks <- StreamChunk{
-			Done:       true,
-			TokenCount: len(words) * 2,
+		// Wait for completion or context cancellation
+		select {
+		case <-done:
+			// Final chunk with token count
+			chunks <- StreamChunk{
+				Done:       true,
+				TokenCount: estimateTokenCount(fullContent),
+			}
+		case <-ctx.Done():
+			session.Abort()
+			chunks <- StreamChunk{Error: ctx.Err()}
+		case <-s.shutdown:
+			session.Abort()
 		}
 	}()
 
@@ -151,74 +396,159 @@ func (s *Service) StreamPrompt(ctx context.Context, modelID, prompt string) (<-c
 }
 
 // RequestVote asks a model to vote on anonymized responses
-func (s *Service) RequestVote(ctx context.Context, modelID, question string, responses map[string]string) ([]string, error) {
+func (s *Service) RequestVote(ctx context.Context, userID, accessToken, modelID, question string, responses map[string]string) ([]string, error) {
+	log.Printf("[COPILOT] RequestVote - user: %s, model: %s, responses: %d", userID, modelID, len(responses))
+
 	// Build voting prompt
-	prompt := fmt.Sprintf(`You are evaluating responses to the following question:
+	prompt := fmt.Sprintf(`You are an expert evaluator assessing responses to a question. Your task is to rank the following anonymized responses from best to worst based on:
+- Accuracy and correctness
+- Completeness and depth
+- Clarity and organization
+- Practical usefulness
 
 Question: %s
 
-Here are the anonymized responses:
+Here are the anonymized responses to evaluate:
 
 `, question)
 
+	labels := make([]string, 0, len(responses))
 	for label, content := range responses {
+		labels = append(labels, label)
 		prompt += fmt.Sprintf("--- %s ---\n%s\n\n", label, content)
 	}
 
-	prompt += `Please rank these responses from best to worst. Return ONLY a comma-separated list of labels in order from best to worst (e.g., "Response B, Response A, Response C").`
-	_ = prompt // Will be used when Copilot SDK is integrated
+	prompt += `Instructions:
+1. Evaluate each response carefully
+2. Return ONLY a comma-separated list of labels ranked from BEST to WORST
+3. Example format: "Response B, Response A, Response C"
+4. Do not include any other text, just the ranked list
 
-	// TODO: Integrate with actual Copilot SDK
-	// For now, return a placeholder ranking
-	labels := make([]string, 0, len(responses))
-	for label := range responses {
-		labels = append(labels, label)
+Your ranking:`
+
+	resp, err := s.SendPrompt(ctx, userID, accessToken, modelID, prompt)
+	if err != nil {
+		return nil, err
 	}
 
-	return labels, nil
+	// Parse the response to extract rankings
+	ranking := parseRanking(resp.Content, labels)
+	if len(ranking) == 0 {
+		// Fallback: return labels in original order
+		log.Printf("[COPILOT] WARNING: Could not parse ranking, using original order")
+		return labels, nil
+	}
+
+	log.Printf("[COPILOT] Vote result from %s: %v", modelID, ranking)
+	return ranking, nil
+}
+
+// parseRanking extracts ranked labels from the response
+func parseRanking(response string, validLabels []string) []string {
+	var result []string
+	seen := make(map[string]bool)
+
+	// Look for labels in the response in order of appearance
+	for _, label := range validLabels {
+		for i := 0; i <= len(response)-len(label); i++ {
+			if response[i:i+len(label)] == label && !seen[label] {
+				// Check if it's a valid match (word boundary)
+				validStart := i == 0 || !isAlphaNum(response[i-1])
+				validEnd := i+len(label) >= len(response) || !isAlphaNum(response[i+len(label)])
+				if validStart && validEnd {
+					result = append(result, label)
+					seen[label] = true
+					break
+				}
+			}
+		}
+	}
+
+	// Add any missing labels at the end
+	for _, label := range validLabels {
+		if !seen[label] {
+			result = append(result, label)
+		}
+	}
+
+	return result
+}
+
+func isAlphaNum(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
 }
 
 // RequestSynthesis asks the chairperson to synthesize responses
-func (s *Service) RequestSynthesis(ctx context.Context, modelID, question string, responses map[string]string, votes map[string][]string) (*Response, error) {
-	prompt := fmt.Sprintf(`You are the chairperson synthesizing a council discussion.
+func (s *Service) RequestSynthesis(ctx context.Context, userID, accessToken, modelID, question string, responses map[string]string, votes map[string][]string) (*Response, error) {
+	log.Printf("[COPILOT] RequestSynthesis - user: %s, model: %s, responses: %d, voters: %d", userID, modelID, len(responses), len(votes))
+
+	prompt := fmt.Sprintf(`You are the chairperson of an AI council. Your role is to synthesize the discussion and provide a comprehensive answer.
 
 Original Question: %s
 
-Council Responses:
+The council members have provided the following responses:
+
 `, question)
 
 	for label, content := range responses {
 		prompt += fmt.Sprintf("--- %s ---\n%s\n\n", label, content)
 	}
 
-	prompt += "\nVoting Results:\n"
+	prompt += "\nCouncil Voting Results (ranked from best to worst):\n"
 	for voter, ranking := range votes {
 		prompt += fmt.Sprintf("- %s ranked: %v\n", voter, ranking)
 	}
 
-	prompt += `\nPlease provide a comprehensive synthesis that:
-1. Identifies the consensus view
-2. Highlights key insights from top-ranked responses
-3. Notes any significant minority opinions
-4. Provides a clear, actionable answer to the original question`
+	prompt += `
 
-	return s.SendPrompt(ctx, modelID, prompt)
+As the chairperson, please provide a synthesis that:
+1. Identifies the consensus view based on voting results
+2. Highlights key insights from the top-ranked responses
+3. Notes any significant minority opinions or alternative perspectives
+4. Provides a clear, comprehensive, and actionable final answer
+
+Your synthesis:`
+
+	return s.SendPrompt(ctx, userID, accessToken, modelID, prompt)
 }
 
 // Shutdown gracefully shuts down the service
 func (s *Service) Shutdown() {
+	log.Printf("[COPILOT] Shutting down Copilot service...")
 	close(s.shutdown)
+
+	// Wait for cleanup goroutine to finish
+	<-s.cleanupDone
+
+	// Stop all clients
+	s.clientsMu.Lock()
+	for userID, uc := range s.clients {
+		log.Printf("[COPILOT] Stopping client for user: %s", userID)
+		uc.client.Stop()
+	}
+	s.clients = make(map[string]*userClient)
+	s.clientsMu.Unlock()
+
+	log.Printf("[COPILOT] Copilot service shutdown complete")
 }
 
-// IsModelAvailable checks if a model is available
-func (s *Service) IsModelAvailable(modelID string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+// IsModelAvailable checks if a model is available for a user
+func (s *Service) IsModelAvailable(ctx context.Context, userID, accessToken, modelID string) bool {
+	models, err := s.ListModels(ctx, userID, accessToken)
+	if err != nil {
+		return false
+	}
 
-	for _, m := range s.models {
+	for _, m := range models {
 		if m.ID == modelID {
 			return true
 		}
 	}
 	return false
+}
+
+// estimateTokenCount provides a rough token estimate
+func estimateTokenCount(content string) int {
+	// Rough estimate: ~4 chars per token for English text
+	return len(content) / 4
 }

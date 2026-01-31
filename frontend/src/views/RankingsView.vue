@@ -18,11 +18,14 @@ async function fetchRankings() {
       ? await rankingsApi.global()
       : await rankingsApi.byCategory(selectedCategory.value)
 
-    rankings.value = selectedCategory.value === 'global'
+    // Handle null responses - ensure we always have an array
+    const data = selectedCategory.value === 'global'
       ? response.data
-      : response.data.rankings
+      : response.data?.rankings
+    rankings.value = Array.isArray(data) ? data : []
   } catch (e) {
     console.error('Failed to fetch rankings', e)
+    rankings.value = []
   } finally {
     loading.value = false
   }

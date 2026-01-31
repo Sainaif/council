@@ -68,6 +68,8 @@ func main() {
 	log.Println("Initializing services...")
 	authService := auth.NewGitHubAuth(cfg)
 	copilotService := copilot.NewService()
+	log.Println("Copilot service initialized (per-user authentication via OAuth)")
+
 	eloService := elo.NewCalculator(db)
 	wsHub := websocket.NewHub()
 	councilService := council.NewOrchestrator(db, copilotService, eloService, wsHub)

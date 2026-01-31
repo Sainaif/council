@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/sainaif/council/internal/database"
+	"github.com/sainaif/council/internal/middleware"
 	"github.com/sainaif/council/internal/services/copilot"
 )
 
@@ -32,12 +33,21 @@ type ModelResponse struct {
 }
 
 func (h *ModelHandler) List(c *fiber.Ctx) error {
-	// Get models from Copilot service
-	models, err := h.copilot.ListModels(c.Context())
+	// Get user's access token from JWT claims
+	claims := middleware.GetClaims(c)
+	if claims == nil || claims.AccessToken == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":   true,
+			"message": "Authentication required for model access",
+		})
+	}
+
+	// Get models from Copilot service using user's token
+	models, err := h.copilot.ListModels(c.Context(), claims.UserID, claims.AccessToken)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   true,
-			"message": "Failed to list models",
+			"message": "Failed to list models: " + err.Error(),
 		})
 	}
 
@@ -92,8 +102,17 @@ func (h *ModelHandler) Get(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get user's access token from JWT claims
+	claims := middleware.GetClaims(c)
+	if claims == nil || claims.AccessToken == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":   true,
+			"message": "Authentication required",
+		})
+	}
+
 	// Get model from Copilot service
-	model, err := h.copilot.GetModel(c.Context(), modelID)
+	model, err := h.copilot.GetModel(c.Context(), claims.UserID, claims.AccessToken, modelID)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error":   true,
@@ -162,8 +181,8 @@ func (h *ModelHandler) Get(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"model":           mr,
-		"category_stats":  categoryStats,
+		"model":          mr,
+		"category_stats": categoryStats,
 	})
 }
 

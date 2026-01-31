@@ -104,8 +104,8 @@ func (h *AuthHandler) Callback(c *fiber.Ctx) error {
 		log.Printf("Failed to update user preferences: %v", err)
 	}
 
-	// Create JWT token
-	jwtToken, err := h.auth.CreateToken(user)
+	// Create JWT token (include OAuth access token for Copilot SDK)
+	jwtToken, err := h.auth.CreateToken(user, token.AccessToken)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   true,

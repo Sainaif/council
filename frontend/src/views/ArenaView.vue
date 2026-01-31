@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCouncilStore, type CouncilMode, type StartSessionRequest } from '../stores/council'
 import { useModelsStore } from '../stores/models'
@@ -22,6 +22,18 @@ const canStart = computed(() => {
 const isActive = computed(() => {
   return ['pending', 'responding', 'voting', 'synthesizing'].includes(councilStore.status)
 })
+
+// Initialize userVote when responses are available and voting starts
+const userVote = ref<string[]>([])
+watch(
+  () => ({ status: councilStore.status, responses: councilStore.anonymizedResponses }),
+  ({ status, responses }) => {
+    if ((status === 'voting' || status === 'completed') && userVote.value.length === 0 && responses.length > 0) {
+      userVote.value = responses.map(r => r.label)
+    }
+  },
+  { immediate: true }
+)
 
 function toggleModel(modelId: string) {
   const index = selectedModels.value.indexOf(modelId)
@@ -50,9 +62,8 @@ function newCouncil() {
   councilStore.reset()
   question.value = ''
   selectedModels.value = []
+  userVote.value = []
 }
-
-const userVote = ref<string[]>([])
 
 function moveUp(index: number) {
   if (index > 0 && index < userVote.value.length) {

@@ -25,7 +25,14 @@ async function fetchSettings() {
   loading.value = true
   try {
     const response = await settingsApi.get()
-    settings.value = { ...settings.value, ...response.data }
+    // Merge with defaults to ensure all fields exist
+    settings.value = {
+      default_models: response.data?.default_models || [],
+      language: response.data?.language || 'en',
+      ui_density: response.data?.ui_density || 'comfortable',
+      auto_save_sessions: response.data?.auto_save_sessions ?? true,
+      user_feedback_weight: response.data?.user_feedback_weight ?? 0.5
+    }
   } catch (e) {
     console.error('Failed to fetch settings', e)
   } finally {

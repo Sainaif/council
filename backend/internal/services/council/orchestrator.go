@@ -53,6 +53,7 @@ type StartRequest struct {
 type Session struct {
 	ID              string        `json:"id"`
 	UserID          string        `json:"user_id"`
+	AccessToken     string        `json:"-"` // Not serialized, used for Copilot SDK
 	Question        string        `json:"question"`
 	Mode            Mode          `json:"mode"`
 	Status          SessionStatus `json:"status"`
@@ -114,7 +115,7 @@ func NewOrchestrator(db *database.DB, copilot *copilot.Service, elo *elo.Calcula
 	}
 }
 
-func (o *Orchestrator) StartSession(ctx context.Context, userID string, req StartRequest) (*Session, error) {
+func (o *Orchestrator) StartSession(ctx context.Context, userID string, accessToken string, req StartRequest) (*Session, error) {
 	// Validate request
 	if err := o.validateRequest(req); err != nil {
 		return nil, err
@@ -163,7 +164,7 @@ func (o *Orchestrator) StartSession(ctx context.Context, userID string, req Star
 
 	// Register models BEFORE inserting session (foreign key constraint)
 	for _, modelID := range req.Models {
-		model, err := o.copilot.GetModel(ctx, modelID)
+		model, err := o.copilot.GetModel(ctx, userID, accessToken, modelID)
 		if err != nil {
 			continue
 		}
@@ -185,6 +186,7 @@ func (o *Orchestrator) StartSession(ctx context.Context, userID string, req Star
 	session := &Session{
 		ID:              sessionID,
 		UserID:          userID,
+		AccessToken:     accessToken,
 		Question:        req.Question,
 		Mode:            req.Mode,
 		Status:          StatusPending,
@@ -383,8 +385,8 @@ func (o *Orchestrator) collectResponses(ctx context.Context, session *Session, m
 
 			start := time.Now()
 
-			// Stream response
-			chunks, err := o.copilot.StreamPrompt(ctx, mID, prompt)
+			// Stream response using user's access token
+			chunks, err := o.copilot.StreamPrompt(ctx, session.UserID, session.AccessToken, mID, prompt)
 			if err != nil {
 				mu.Lock()
 				errors = append(errors, err)
@@ -481,8 +483,8 @@ func (o *Orchestrator) collectVotes(ctx context.Context, session *Session, respo
 		go func(mID string) {
 			defer wg.Done()
 
-			// Request vote
-			ranking, err := o.copilot.RequestVote(ctx, mID, session.Question, anonymizedResponses)
+			// Request vote using user's access token
+			ranking, err := o.copilot.RequestVote(ctx, session.UserID, session.AccessToken, mID, session.Question, anonymizedResponses)
 			if err != nil {
 				return
 			}
@@ -543,8 +545,8 @@ func (o *Orchestrator) synthesize(ctx context.Context, session *Session, respons
 		voteMap[v.VoterID] = v.RankedResponses
 	}
 
-	// Request synthesis
-	synthesis, err := o.copilot.RequestSynthesis(ctx, *session.ChairpersonID, session.Question, respMap, voteMap)
+	// Request synthesis using user's access token
+	synthesis, err := o.copilot.RequestSynthesis(ctx, session.UserID, session.AccessToken, *session.ChairpersonID, session.Question, respMap, voteMap)
 	if err != nil {
 		return err
 	}

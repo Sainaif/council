@@ -32,12 +32,20 @@ type StartCouncilRequest struct {
 }
 
 func (h *CouncilHandler) Start(c *fiber.Ctx) error {
-	userID := middleware.GetUserID(c)
-	if userID == "" {
-		log.Printf("[COUNCIL] Start request rejected - no user ID")
+	claims := middleware.GetClaims(c)
+	if claims == nil {
+		log.Printf("[COUNCIL] Start request rejected - no claims")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error":   true,
 			"message": "Unauthorized",
+		})
+	}
+
+	if claims.AccessToken == "" {
+		log.Printf("[COUNCIL] Start request rejected - no access token for user: %s", claims.UserID)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":   true,
+			"message": "GitHub Copilot access required. Please log out and log in again.",
 		})
 	}
 
@@ -51,7 +59,7 @@ func (h *CouncilHandler) Start(c *fiber.Ctx) error {
 	}
 
 	log.Printf("[COUNCIL] Starting session - user: %s, mode: %s, models: %v, question: %.50s...",
-		userID, req.Mode, req.Models, req.Question)
+		claims.UserID, req.Mode, req.Models, req.Question)
 
 	// Map to internal request
 	startReq := council.StartRequest{
@@ -66,9 +74,9 @@ func (h *CouncilHandler) Start(c *fiber.Ctx) error {
 		ResponseTimeout: req.ResponseTimeout,
 	}
 
-	session, err := h.orchestrator.StartSession(c.Context(), userID, startReq)
+	session, err := h.orchestrator.StartSession(c.Context(), claims.UserID, claims.AccessToken, startReq)
 	if err != nil {
-		log.Printf("[COUNCIL] Failed to start session for user %s: %v", userID, err)
+		log.Printf("[COUNCIL] Failed to start session for user %s: %v", claims.UserID, err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": err.Error(),
@@ -200,4 +208,63 @@ func (h *CouncilHandler) Cancel(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Session cancelled",
 	})
+}
+
+// History returns the user's session history
+func (h *CouncilHandler) History(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":   true,
+			"message": "Unauthorized",
+		})
+	}
+
+	limit := c.QueryInt("limit", 20)
+	if limit > 100 {
+		limit = 100
+	}
+
+	sessions := make([]map[string]interface{}, 0)
+	rows, err := h.db.Query(`
+		SELECT id, question, mode, status, created_at, completed_at
+		FROM sessions
+		WHERE user_id = ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, userID, limit)
+	if err != nil {
+		log.Printf("[COUNCIL] Failed to fetch history for user %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   true,
+			"message": "Failed to fetch history",
+		})
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var id, question, mode, status string
+		var createdAt string
+		var completedAt *string
+		if err := rows.Scan(&id, &question, &mode, &status, &createdAt, &completedAt); err != nil {
+			continue
+		}
+
+		// Get response count for this session
+		var responseCount int
+		_ = h.db.QueryRow(`SELECT COUNT(*) FROM responses WHERE session_id = ?`, id).Scan(&responseCount)
+
+		sessions = append(sessions, map[string]interface{}{
+			"id":             id,
+			"question":       question,
+			"mode":           mode,
+			"status":         status,
+			"created_at":     createdAt,
+			"completed_at":   completedAt,
+			"response_count": responseCount,
+		})
+	}
+
+	log.Printf("[COUNCIL] Fetched %d sessions for user %s", len(sessions), userID)
+	return c.JSON(sessions)
 }
