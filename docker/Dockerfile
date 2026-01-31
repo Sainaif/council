@@ -37,19 +37,18 @@ RUN printf 'package config\n\nconst (\n\tDefaultGitHubClientID     = "%s"\n\tDef
 # Build backend
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o council ./cmd/council
 
-# Stage 3: Final image
-FROM alpine:3.23
+# Stage 3: Final image (using Debian for glibc compatibility with Copilot CLI)
+FROM debian:bookworm-slim
 
 # Install runtime dependencies and GitHub Copilot CLI
-# coreutils needed for sha256sum with --ignore-missing (BusyBox version lacks this flag)
-# gcompat/libstdc++ needed for glibc compatibility with Copilot CLI binary
-RUN apk add --no-cache ca-certificates tzdata git curl bash gcompat libstdc++ coreutils \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tzdata git curl wget \
+    && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL https://gh.io/copilot-install | bash \
-    && copilot --version \
-    && rm -rf /tmp/*
+    && copilot --version
 
 # Create non-root user
-RUN addgroup -S council && adduser -S council -G council
+RUN groupadd --system council && useradd --system --gid council council
 
 WORKDIR /app
 
