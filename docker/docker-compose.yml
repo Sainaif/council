@@ -1,19 +1,42 @@
-version: '3.8'
-
 services:
   council:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      args:
-        - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-        - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+    # Use the prebuilt image from GitHub Container Registry
+    image: ghcr.io/sainaif/council:latest
+
+    # Alternatively, build the image locally from source.
+    # Uncomment the 'build' section below and comment out the 'image' line above.
+    # Building from source allows you to embed OAuth credentials at build time,
+    # which can be useful for custom deployments.
+    #
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
+    #   args:
+    #     # These build args embed OAuth credentials directly into the image.
+    #     # The image will work without setting these env vars at runtime.
+    #     # Only needed if you want to create a self-contained image with built-in credentials.
+    #     GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+    #     GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+
     ports:
       - "8080:8080"
     volumes:
       - council_data:/data
     environment:
+      # OAuth credentials - optional overrides for the built-in defaults.
+      # The prebuilt image includes working OAuth credentials, so these are
+      # only needed if you want to use your own GitHub OAuth application.
+      # Uncomment and set these to override the built-in defaults:
+      # - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      # - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+
+      # Session secret for cookie signing (auto-generated if not set)
+      - SESSION_SECRET=${SESSION_SECRET}
+
+      # Database location (inside the mounted volume)
       - DATABASE_PATH=/data/council.db
+
+      # Server configuration
       - PORT=8080
       - ENV=production
     restart: unless-stopped
