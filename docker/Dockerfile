@@ -41,13 +41,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o council ./cmd/council
 FROM alpine:3.23
 
 # Install runtime dependencies and GitHub Copilot CLI
-# Download directly from GitHub releases (gcompat/libstdc++ needed for glibc compatibility)
-RUN apk add --no-cache ca-certificates tzdata git curl bash gcompat libstdc++ \
-    && curl -fsSL "https://github.com/github/copilot-cli/releases/latest/download/copilot-linux-x64.tar.gz" -o /tmp/copilot.tar.gz \
-    && tar -xzf /tmp/copilot.tar.gz -C /tmp \
-    && mv /tmp/copilot /usr/local/bin/copilot \
-    && chmod +x /usr/local/bin/copilot \
-    && rm -rf /tmp/copilot.tar.gz /tmp/copilot-*
+# coreutils needed for sha256sum with --ignore-missing (BusyBox version lacks this flag)
+# gcompat/libstdc++ needed for glibc compatibility with Copilot CLI binary
+RUN apk add --no-cache ca-certificates tzdata git curl bash gcompat libstdc++ coreutils \
+    && curl -fsSL https://gh.io/copilot-install | bash \
+    && rm -rf /tmp/*
 
 # Create non-root user
 RUN addgroup -S council && adduser -S council -G council
