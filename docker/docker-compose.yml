@@ -30,6 +30,11 @@ services:
       # - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       # - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
 
+      # Frontend URL - used to construct the OAuth callback URL.
+      # Must match the callback URL configured in your GitHub OAuth App.
+      # Default: http://localhost:8080 (the built-in OAuth app uses this)
+      - FRONTEND_URL=http://localhost:8080
+
       # Session secret for cookie signing (auto-generated if not set)
       - SESSION_SECRET=${SESSION_SECRET}
 

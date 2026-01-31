@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -79,6 +80,8 @@ func (h *AuthHandler) Callback(c *fiber.Ctx) error {
 	}
 
 	// Create or update user preferences
+	// Use fmt.Sprintf to convert int64 to string to match JWT token's UserID format
+	userID := fmt.Sprintf("%d", user.ID)
 	_, err = h.db.Exec(`
 		INSERT INTO user_preferences (user_id, github_username, github_avatar_url, updated_at)
 		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -86,7 +89,7 @@ func (h *AuthHandler) Callback(c *fiber.Ctx) error {
 			github_username = ?,
 			github_avatar_url = ?,
 			updated_at = CURRENT_TIMESTAMP
-	`, user.ID, user.Login, user.AvatarURL, user.Login, user.AvatarURL)
+	`, userID, user.Login, user.AvatarURL, user.Login, user.AvatarURL)
 	if err != nil {
 		// Log but don't fail - user can still use the app
 		log.Printf("Failed to update user preferences: %v", err)

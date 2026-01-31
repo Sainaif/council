@@ -160,16 +160,7 @@ func (o *Orchestrator) StartSession(ctx context.Context, userID string, req Star
 
 	configJSON, _ := json.Marshal(config)
 
-	// Insert session
-	_, err := o.db.Exec(`
-		INSERT INTO sessions (id, user_id, question, category_id, mode, status, config, chairperson_id, devil_advocate_id, mystery_judge_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, sessionID, userID, req.Question, req.CategoryID, req.Mode, StatusPending, string(configJSON), chairpersonID, devilID, mysteryID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
-	}
-
-	// Register models if they don't exist
+	// Register models BEFORE inserting session (foreign key constraint)
 	for _, modelID := range req.Models {
 		model, err := o.copilot.GetModel(ctx, modelID)
 		if err != nil {
@@ -179,6 +170,15 @@ func (o *Orchestrator) StartSession(ctx context.Context, userID string, req Star
 			INSERT OR IGNORE INTO models (id, display_name, provider)
 			VALUES (?, ?, ?)
 		`, model.ID, model.DisplayName, model.Provider)
+	}
+
+	// Insert session
+	_, err := o.db.Exec(`
+		INSERT INTO sessions (id, user_id, question, category_id, mode, status, config, chairperson_id, devil_advocate_id, mystery_judge_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, sessionID, userID, req.Question, req.CategoryID, req.Mode, StatusPending, string(configJSON), chairpersonID, devilID, mysteryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	session := &Session{
