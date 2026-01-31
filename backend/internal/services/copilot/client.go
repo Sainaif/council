@@ -263,7 +263,11 @@ func (s *Service) SendPrompt(ctx context.Context, userID, accessToken, modelID, 
 		log.Printf("[COPILOT] ERROR: Failed to create session: %v", err)
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Destroy()
+	defer func() {
+		if err := session.Destroy(); err != nil {
+			log.Printf("[COPILOT] WARN: Failed to destroy session: %v", err)
+		}
+	}()
 
 	// Send the message and wait for response
 	resp, err := session.SendAndWait(copilot.MessageOptions{
@@ -315,7 +319,11 @@ func (s *Service) StreamPrompt(ctx context.Context, userID, accessToken, modelID
 			chunks <- StreamChunk{Error: err}
 			return
 		}
-		defer session.Destroy()
+		defer func() {
+			if err := session.Destroy(); err != nil {
+				log.Printf("[COPILOT] WARN: Failed to destroy streaming session: %v", err)
+			}
+		}()
 
 		// Track content and completion
 		var fullContent string
@@ -385,10 +393,14 @@ func (s *Service) StreamPrompt(ctx context.Context, userID, accessToken, modelID
 				TokenCount: estimateTokenCount(fullContent),
 			}
 		case <-ctx.Done():
-			session.Abort()
+			if err := session.Abort(); err != nil {
+				log.Printf("[COPILOT] WARN: Failed to abort session on context cancel: %v", err)
+			}
 			chunks <- StreamChunk{Error: ctx.Err()}
 		case <-s.shutdown:
-			session.Abort()
+			if err := session.Abort(); err != nil {
+				log.Printf("[COPILOT] WARN: Failed to abort session on shutdown: %v", err)
+			}
 		}
 	}()
 
