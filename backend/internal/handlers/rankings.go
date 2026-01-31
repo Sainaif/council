@@ -73,7 +73,7 @@ func (h *RankingHandler) Global(c *fiber.Ctx) error {
 
 		// Get recent trend
 		var recentChange sql.NullInt64
-		h.db.QueryRow(`
+		_ = h.db.QueryRow(`
 			SELECT SUM(change) FROM elo_history
 			WHERE model_id = ? AND created_at > datetime('now', '-7 days')
 		`, e.ModelID).Scan(&recentChange)
@@ -132,12 +132,12 @@ func (h *RankingHandler) ByCategory(c *fiber.Ctx) error {
 			"message": "Failed to get rankings",
 		})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	rank := 1
 	for rows.Next() {
 		var e RankingEntry
-		rows.Scan(&e.ModelID, &e.DisplayName, &e.Provider, &e.Rating, &e.Wins, &e.Losses, &e.Draws)
+		_ = rows.Scan(&e.ModelID, &e.DisplayName, &e.Provider, &e.Rating, &e.Wins, &e.Losses, &e.Draws)
 		e.Rank = rank
 		e.GamesPlayed = e.Wins + e.Losses + e.Draws
 		if e.GamesPlayed > 0 {
@@ -203,12 +203,12 @@ func (h *RankingHandler) HeadToHead(c *fiber.Ctx) error {
 		LEFT JOIN matchups m ON c.id = m.category_id AND m.model_a_id = ? AND m.model_b_id = ?
 	`, modelA, modelB)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var ms MatchupStats
 			var catID int64
 			var catName string
-			rows.Scan(&catID, &catName, &ms.ModelAWins, &ms.ModelBWins, &ms.Draws)
+			_ = rows.Scan(&catID, &catName, &ms.ModelAWins, &ms.ModelBWins, &ms.Draws)
 			ms.CategoryID = &catID
 			ms.CategoryName = &catName
 			ms.TotalGames = ms.ModelAWins + ms.ModelBWins + ms.Draws
@@ -225,13 +225,13 @@ func (h *RankingHandler) HeadToHead(c *fiber.Ctx) error {
 	}
 
 	var infoA, infoB ModelInfo
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT m.id, m.display_name, m.provider, COALESCE(AVG(mr.rating), 1500)
 		FROM models m LEFT JOIN model_ratings mr ON m.id = mr.model_id
 		WHERE m.id = ? GROUP BY m.id
 	`, modelA).Scan(&infoA.ID, &infoA.DisplayName, &infoA.Provider, &infoA.Rating)
 
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT m.id, m.display_name, m.provider, COALESCE(AVG(mr.rating), 1500)
 		FROM models m LEFT JOIN model_ratings mr ON m.id = mr.model_id
 		WHERE m.id = ? GROUP BY m.id
