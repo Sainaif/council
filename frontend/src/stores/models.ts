@@ -37,13 +37,20 @@ export const useModelsStore = defineStore('models', () => {
   })
 
   async function fetchModels() {
+    if (loading.value) {
+      console.log('[ModelsStore] Already loading, skipping')
+      return
+    }
     loading.value = true
     error.value = null
+    console.log('[ModelsStore] Fetching models...')
     try {
       const response = await api.get('/api/models')
       models.value = response.data
+      console.log('[ModelsStore] Loaded', models.value.length, 'models')
     } catch (e: any) {
       error.value = e.response?.data?.message || 'Failed to fetch models'
+      console.error('[ModelsStore] Error fetching models:', error.value, e)
     } finally {
       loading.value = false
     }

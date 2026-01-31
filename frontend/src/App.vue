@@ -10,8 +10,12 @@ const modelsStore = useModelsStore()
 
 // Watch for authentication state changes and load models when authenticated
 watch(() => authStore.isAuthenticated, async (isAuthenticated) => {
-  if (isAuthenticated && modelsStore.models.length === 0) {
-    await modelsStore.fetchModels()
+  if (isAuthenticated) {
+    // Always try to fetch models when authenticated, store will handle caching
+    if (modelsStore.models.length === 0 && !modelsStore.loading) {
+      console.log('[App] Fetching models after authentication')
+      await modelsStore.fetchModels()
+    }
   }
 }, { immediate: true })
 </script>

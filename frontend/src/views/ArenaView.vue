@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCouncilStore, type CouncilMode, type StartSessionRequest } from '../stores/council'
 import { useModelsStore } from '../stores/models'
@@ -14,6 +14,13 @@ const mode = ref<CouncilMode>('standard')
 const debateRounds = ref(3)
 const enableDevil = ref(false)
 const enableMystery = ref(false)
+
+// Fetch models if not already loaded
+onMounted(() => {
+  if (modelsStore.models.length === 0 && !modelsStore.loading) {
+    modelsStore.fetchModels()
+  }
+})
 
 const canStart = computed(() => {
   return question.value.trim().length > 0 && selectedModels.value.length >= 2
@@ -108,7 +115,25 @@ async function submitVote() {
       <!-- Model Selection -->
       <div class="card p-4">
         <h2 class="text-lg font-medium mb-4">{{ t('arena.select_models') }} ({{ selectedModels.length }}/8)</h2>
-        <div class="flex flex-wrap gap-2">
+        
+        <!-- Loading state -->
+        <div v-if="modelsStore.loading" class="text-text-secondary py-4">
+          {{ t('common.loading') }}
+        </div>
+        
+        <!-- Error state -->
+        <div v-else-if="modelsStore.error" class="text-error py-4">
+          {{ modelsStore.error }}
+          <button @click="modelsStore.fetchModels()" class="btn btn-ghost ml-2">Retry</button>
+        </div>
+        
+        <!-- Empty state -->
+        <div v-else-if="modelsStore.models.length === 0" class="text-text-secondary py-4">
+          No models available. Make sure your GitHub account has Copilot access.
+        </div>
+        
+        <!-- Models list -->
+        <div v-else class="flex flex-wrap gap-2">
           <button
             v-for="model in modelsStore.models"
             :key="model.id"
