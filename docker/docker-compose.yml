@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  council:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+        - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+    ports:
+      - "8080:8080"
+    volumes:
+      - council_data:/data
+    environment:
+      - DATABASE_PATH=/data/council.db
+      - PORT=8080
+      - ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  council_data:
+    driver: local

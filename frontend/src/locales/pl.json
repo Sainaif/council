@@ -1,0 +1,127 @@
+{
+  "_meta": {
+    "language": "Polski",
+    "code": "pl",
+    "version": "1.0.0"
+  },
+  "common": {
+    "submit": "Wyslij",
+    "cancel": "Anuluj",
+    "save": "Zapisz",
+    "delete": "Usun",
+    "loading": "Ladowanie...",
+    "error": "Blad",
+    "success": "Sukces",
+    "close": "Zamknij",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "previous": "Poprzedni",
+    "search": "Szukaj",
+    "filter": "Filtruj",
+    "export": "Eksportuj",
+    "refresh": "Odswiez"
+  },
+  "nav": {
+    "arena": "Arena",
+    "rankings": "Ranking",
+    "history": "Historia",
+    "analytics": "Analityka",
+    "settings": "Ustawienia",
+    "logout": "Wyloguj"
+  },
+  "auth": {
+    "login": "Zaloguj",
+    "login_with_github": "Zaloguj przez GitHub",
+    "welcome": "Witaj w Council Arena",
+    "tagline": "Modele AI debatuja, glosuja i syntetyzuja odpowiedzi"
+  },
+  "arena": {
+    "title": "Arena Rady",
+    "question_placeholder": "Wpisz pytanie dla rady...",
+    "select_models": "Wybierz modele",
+    "select_mode": "Wybierz tryb",
+    "start_council": "Rozpocznij rade",
+    "stage_responding": "Modele odpowiadaja...",
+    "stage_voting": "Modele glosuja...",
+    "stage_synthesizing": "Synteza koncowej odpowiedzi...",
+    "synthesis": "Koncowa synteza",
+    "minority_report": "Raport mniejszosci",
+    "your_vote": "Twoj glos",
+    "vote_instructions": "Przeciagnij aby uszeregowac odpowiedzi od najlepszej do najgorszej",
+    "submit_vote": "Oddaj glos",
+    "new_council": "Nowa rada"
+  },
+  "modes": {
+    "standard": "Standardowy",
+    "standard_desc": "Jedna runda odpowiedzi ze slepym glosowaniem",
+    "debate": "Debata",
+    "debate_desc": "Wiele rund z replikami",
+    "tournament": "Turniej",
+    "tournament_desc": "Eliminacje drabinkowe"
+  },
+  "models": {
+    "elo_rating": "Ranking ELO",
+    "wins": "Wygrane",
+    "losses": "Przegrane",
+    "draws": "Remisy",
+    "win_rate": "Procent wygranych",
+    "games_played": "Rozegrane gry",
+    "trend": "Trend",
+    "provider": "Dostawca"
+  },
+  "voting": {
+    "vote_for_best": "Zaglosuj na najlepsza odpowiedz",
+    "submit_vote": "Oddaj glos",
+    "your_feedback": "Twoja opinia",
+    "thank_you": "Dziekujemy za glos!"
+  },
+  "rankings": {
+    "title": "Ranking modeli",
+    "global": "Globalny",
+    "by_category": "Wedlug kategorii",
+    "head_to_head": "Bezposrednie starcia",
+    "compare": "Porownaj modele"
+  },
+  "analytics": {
+    "title": "Analityka",
+    "overview": "Przeglad",
+    "total_sessions": "Wszystkie sesje",
+    "completed": "Ukonczone",
+    "user_bias": "Stronniczosc uzytkownika",
+    "costs": "Uzycie i koszty",
+    "tokens_used": "Uzyte tokeny",
+    "most_used_model": "Najczesciej uzywany model",
+    "top_performer": "Najlepszy wykonawca"
+  },
+  "history": {
+    "title": "Historia sesji",
+    "no_sessions": "Brak sesji",
+    "view_details": "Zobacz szczegoly"
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "account": "Konto",
+    "preferences": "Preferencje",
+    "default_models": "Domyslne modele",
+    "language": "Jezyk",
+    "ui_density": "Gestosc interfejsu",
+    "compact": "Kompaktowy",
+    "comfortable": "Wygodny",
+    "auto_save": "Automatyczny zapis sesji",
+    "feedback_weight": "Waga opinii uzytkownika"
+  },
+  "errors": {
+    "session_failed": "Sesja nieudana",
+    "model_unavailable": "Model niedostepny",
+    "timeout": "Przekroczono limit czasu",
+    "connection_lost": "Utracono polaczenie",
+    "unauthorized": "Zaloguj sie aby kontynuowac"
+  },
+  "categories": {
+    "general": "Ogolne",
+    "coding": "Programowanie",
+    "creative": "Kreatywne",
+    "reasoning": "Rozumowanie",
+    "math": "Matematyka"
+  }
+}

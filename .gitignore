@@ -1,0 +1,47 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data directory (contains session secret and database)
+data/
+.session_secret
+
+# Database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Secrets (generated during build)
+backend/internal/config/secrets.go
+
+# Go
+backend/council
+backend/*.exe
+backend/*.test
+backend/*.out
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/

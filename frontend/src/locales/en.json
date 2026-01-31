@@ -1,0 +1,127 @@
+{
+  "_meta": {
+    "language": "English",
+    "code": "en",
+    "version": "1.0.0"
+  },
+  "common": {
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "refresh": "Refresh"
+  },
+  "nav": {
+    "arena": "Arena",
+    "rankings": "Rankings",
+    "history": "History",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": "Login",
+    "login_with_github": "Login with GitHub",
+    "welcome": "Welcome to Council Arena",
+    "tagline": "AI models debate, vote, and synthesize answers"
+  },
+  "arena": {
+    "title": "Council Arena",
+    "question_placeholder": "Enter your question for the council...",
+    "select_models": "Select Models",
+    "select_mode": "Select Mode",
+    "start_council": "Start Council",
+    "stage_responding": "Models are responding...",
+    "stage_voting": "Models are voting...",
+    "stage_synthesizing": "Synthesizing final answer...",
+    "synthesis": "Final Synthesis",
+    "minority_report": "Minority Report",
+    "your_vote": "Your Vote",
+    "vote_instructions": "Drag to rank responses from best to worst",
+    "submit_vote": "Submit Vote",
+    "new_council": "New Council"
+  },
+  "modes": {
+    "standard": "Standard",
+    "standard_desc": "Single round of responses with blind voting",
+    "debate": "Debate",
+    "debate_desc": "Multiple rounds with rebuttals",
+    "tournament": "Tournament",
+    "tournament_desc": "Bracket-style elimination"
+  },
+  "models": {
+    "elo_rating": "ELO Rating",
+    "wins": "Wins",
+    "losses": "Losses",
+    "draws": "Draws",
+    "win_rate": "Win Rate",
+    "games_played": "Games Played",
+    "trend": "Trend",
+    "provider": "Provider"
+  },
+  "voting": {
+    "vote_for_best": "Vote for the best response",
+    "submit_vote": "Submit Vote",
+    "your_feedback": "Your Feedback",
+    "thank_you": "Thank you for your vote!"
+  },
+  "rankings": {
+    "title": "Model Rankings",
+    "global": "Global",
+    "by_category": "By Category",
+    "head_to_head": "Head to Head",
+    "compare": "Compare Models"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "overview": "Overview",
+    "total_sessions": "Total Sessions",
+    "completed": "Completed",
+    "user_bias": "User Bias",
+    "costs": "Usage & Costs",
+    "tokens_used": "Tokens Used",
+    "most_used_model": "Most Used Model",
+    "top_performer": "Top Performer"
+  },
+  "history": {
+    "title": "Session History",
+    "no_sessions": "No sessions yet",
+    "view_details": "View Details"
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "Account",
+    "preferences": "Preferences",
+    "default_models": "Default Models",
+    "language": "Language",
+    "ui_density": "UI Density",
+    "compact": "Compact",
+    "comfortable": "Comfortable",
+    "auto_save": "Auto-save sessions",
+    "feedback_weight": "User feedback weight"
+  },
+  "errors": {
+    "session_failed": "Session failed",
+    "model_unavailable": "Model unavailable",
+    "timeout": "Request timed out",
+    "connection_lost": "Connection lost",
+    "unauthorized": "Please login to continue"
+  },
+  "categories": {
+    "general": "General",
+    "coding": "Coding",
+    "creative": "Creative",
+    "reasoning": "Reasoning",
+    "math": "Math"
+  }
+}

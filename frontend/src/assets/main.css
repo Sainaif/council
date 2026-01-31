@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-background text-text-primary;
+  }
+
+  body {
+    @apply min-h-screen antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-elevated rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/50;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-hover active:bg-primary-active text-white;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-elevated hover:bg-surface-hover text-white border border-zinc-700;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent hover:bg-surface-elevated text-text-secondary hover:text-text-primary;
+  }
+
+  .card {
+    @apply bg-surface-elevated rounded-lg border border-zinc-800;
+  }
+
+  .input {
+    @apply w-full px-4 py-2 bg-surface border border-zinc-700 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary;
+  }
+
+  .chip {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors;
+  }
+
+  .chip-selected {
+    @apply bg-primary text-white;
+  }
+
+  .chip-unselected {
+    @apply bg-surface-elevated text-text-secondary hover:bg-surface-hover hover:text-text-primary border border-zinc-700;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent;
+  }
+}
