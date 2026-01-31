@@ -114,7 +114,7 @@ func (s *Service) getOrCreateClient(userID, accessToken string) (*copilot.Client
 	log.Printf("[COPILOT] Creating new client for user: %s", userID)
 
 	opts := &copilot.ClientOptions{
-		LogLevel:    getLogLevel(),
+		LogLevel:    "debug", // Enable debug to see what's happening
 		AutoStart:   copilot.Bool(true),
 		AutoRestart: copilot.Bool(true),
 		GithubToken: accessToken,
@@ -122,9 +122,22 @@ func (s *Service) getOrCreateClient(userID, accessToken string) (*copilot.Client
 
 	client := copilot.NewClient(opts)
 
-	if err := client.Start(); err != nil {
-		log.Printf("[COPILOT] ERROR: Failed to start client for user %s: %v", userID, err)
-		return nil, fmt.Errorf("failed to start Copilot client: %w", err)
+	// Start client with timeout
+	startDone := make(chan error, 1)
+	go func() {
+		startDone <- client.Start()
+	}()
+
+	select {
+	case err := <-startDone:
+		if err != nil {
+			log.Printf("[COPILOT] ERROR: Failed to start client for user %s: %v", userID, err)
+			return nil, fmt.Errorf("failed to start Copilot client: %w", err)
+		}
+	case <-time.After(30 * time.Second):
+		log.Printf("[COPILOT] ERROR: Timeout starting client for user %s", userID)
+		client.Stop()
+		return nil, fmt.Errorf("timeout starting Copilot client")
 	}
 
 	s.clients[userID] = &userClient{

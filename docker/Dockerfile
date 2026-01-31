@@ -45,6 +45,7 @@ FROM alpine:3.23
 # gcompat/libstdc++ needed for glibc compatibility with Copilot CLI binary
 RUN apk add --no-cache ca-certificates tzdata git curl bash gcompat libstdc++ coreutils \
     && curl -fsSL https://gh.io/copilot-install | bash \
+    && copilot --version \
     && rm -rf /tmp/*
 
 # Create non-root user
