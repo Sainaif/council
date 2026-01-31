@@ -47,7 +47,7 @@ function toggleModel(modelId: string) {
   const index = selectedModels.value.indexOf(modelId)
   if (index >= 0) {
     selectedModels.value.splice(index, 1)
-  } else if (selectedModels.value.length < 20) {
+  } else {
     selectedModels.value.push(modelId)
   }
 }
@@ -115,7 +115,7 @@ async function submitVote() {
 
       <!-- Model Selection -->
       <div class="card p-4">
-        <h2 class="text-lg font-medium mb-4">{{ t('arena.select_models') }} ({{ selectedModels.length }}/20)</h2>
+        <h2 class="text-lg font-medium mb-4">{{ t('arena.select_models') }} ({{ selectedModels.length }}/{{ modelsStore.models.length }})</h2>
         
         <!-- Loading state -->
         <div v-if="modelsStore.loading" class="text-text-secondary py-4">
