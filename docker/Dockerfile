@@ -38,7 +38,7 @@ RUN printf 'package config\n\nconst (\n\tDefaultGitHubClientID     = "%s"\n\tDef
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o council ./cmd/council
 
 # Stage 3: Final image
-FROM alpine:3.19
+FROM alpine:3.23
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
