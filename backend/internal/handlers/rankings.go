@@ -57,13 +57,13 @@ func (h *RankingHandler) Global(c *fiber.Ctx) error {
 			"message": "Failed to get rankings",
 		})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	rank := 1
 	for rows.Next() {
 		var e RankingEntry
 		var avgRating float64
-		rows.Scan(&e.ModelID, &e.DisplayName, &e.Provider, &avgRating, &e.Wins, &e.Losses, &e.Draws)
+		_ = rows.Scan(&e.ModelID, &e.DisplayName, &e.Provider, &avgRating, &e.Wins, &e.Losses, &e.Draws)
 		e.Rating = int(avgRating)
 		e.Rank = rank
 		e.GamesPlayed = e.Wins + e.Losses + e.Draws

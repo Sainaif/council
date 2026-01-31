@@ -70,7 +70,7 @@ func (h *ModelHandler) List(c *fiber.Ctx) error {
 
 		// Get average rating
 		var avgRating sql.NullFloat64
-		h.db.QueryRow(`
+		_ = h.db.QueryRow(`
 			SELECT AVG(rating) FROM model_ratings WHERE model_id = ?
 		`, m.ID).Scan(&avgRating)
 		if avgRating.Valid {
@@ -128,10 +128,10 @@ func (h *ModelHandler) Get(c *fiber.Ctx) error {
 		LEFT JOIN model_ratings mr ON c.id = mr.category_id AND mr.model_id = ?
 	`, modelID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var cs CategoryStats
-			rows.Scan(&cs.CategoryID, &cs.CategoryName, &cs.Rating, &cs.Wins, &cs.Losses, &cs.Draws)
+			_ = rows.Scan(&cs.CategoryID, &cs.CategoryName, &cs.Rating, &cs.Wins, &cs.Losses, &cs.Draws)
 			total := cs.Wins + cs.Losses + cs.Draws
 			if total > 0 {
 				cs.WinRate = float64(cs.Wins) / float64(total)
@@ -142,7 +142,7 @@ func (h *ModelHandler) Get(c *fiber.Ctx) error {
 
 	// Get overall stats
 	var wins, losses, draws int
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COALESCE(SUM(wins), 0), COALESCE(SUM(losses), 0), COALESCE(SUM(draws), 0)
 		FROM model_ratings WHERE model_id = ?
 	`, modelID).Scan(&wins, &losses, &draws)
@@ -156,7 +156,7 @@ func (h *ModelHandler) Get(c *fiber.Ctx) error {
 	}
 
 	var avgRating sql.NullFloat64
-	h.db.QueryRow(`SELECT AVG(rating) FROM model_ratings WHERE model_id = ?`, modelID).Scan(&avgRating)
+	_ = h.db.QueryRow(`SELECT AVG(rating) FROM model_ratings WHERE model_id = ?`, modelID).Scan(&avgRating)
 	if avgRating.Valid {
 		mr.Rating = int(avgRating.Float64)
 	}
@@ -205,13 +205,13 @@ func (h *ModelHandler) History(c *fiber.Ctx) error {
 			"message": "Failed to get history",
 		})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var h HistoryEntry
 		var categoryID sql.NullInt64
 		var sessionID sql.NullString
-		rows.Scan(&sessionID, &categoryID, &h.OldRating, &h.NewRating, &h.Change, &h.Reason, &h.CreatedAt)
+		_ = rows.Scan(&sessionID, &categoryID, &h.OldRating, &h.NewRating, &h.Change, &h.Reason, &h.CreatedAt)
 		if sessionID.Valid {
 			h.SessionID = sessionID.String
 		}
