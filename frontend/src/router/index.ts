@@ -48,18 +48,26 @@ const router = createRouter({
   routes
 })
 
+// Track if initial auth check is done
+let initialAuthCheckDone = false
+
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
 
-  // Try to fetch user if not loaded
-  if (!authStore.user && !authStore.loading) {
+  // Do initial auth check only once
+  if (!initialAuthCheckDone) {
+    initialAuthCheckDone = true
     await authStore.fetchUser()
   }
 
+  // Now decide routing based on auth state
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    // Not authenticated, redirect to login with return URL
     next({ name: 'login', query: { redirect: to.fullPath } })
   } else if (to.name === 'login' && authStore.isAuthenticated) {
-    next({ name: 'arena' })
+    // Already authenticated, redirect away from login
+    const redirect = to.query.redirect as string
+    next(redirect || { name: 'arena' })
   } else {
     next()
   }

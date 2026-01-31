@@ -2,18 +2,18 @@
 import { RouterView } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useModelsStore } from './stores/models'
-import { onMounted } from 'vue'
+import { watch } from 'vue'
 import NavBar from './components/base/NavBar.vue'
 
 const authStore = useAuthStore()
 const modelsStore = useModelsStore()
 
-onMounted(async () => {
-  await authStore.fetchUser()
-  if (authStore.isAuthenticated) {
+// Watch for authentication state changes and load models when authenticated
+watch(() => authStore.isAuthenticated, async (isAuthenticated) => {
+  if (isAuthenticated && modelsStore.models.length === 0) {
     await modelsStore.fetchModels()
   }
-})
+}, { immediate: true })
 </script>
 
 <template>

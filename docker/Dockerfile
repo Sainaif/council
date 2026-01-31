@@ -40,12 +40,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o council ./cmd/council
 # Stage 3: Final image
 FROM alpine:3.23
 
-# Install runtime dependencies including GitHub CLI for Copilot
+# Install runtime dependencies and GitHub Copilot CLI
+# Download directly from GitHub releases to avoid install script issues
 RUN apk add --no-cache ca-certificates tzdata git curl bash \
-    && curl -sL https://github.com/cli/cli/releases/download/v2.77.0/gh_2.77.0_linux_amd64.tar.gz | tar xz -C /tmp \
-    && mv /tmp/gh_2.77.0_linux_amd64/bin/gh /usr/local/bin/ \
-    && rm -rf /tmp/gh_2.77.0_linux_amd64 \
-    && chmod +x /usr/local/bin/gh
+    && COPILOT_VERSION=$(curl -sL https://api.github.com/repos/github/copilot-cli/releases/latest | grep '"tag_name"' | cut -d'"' -f4) \
+    && curl -sL "https://github.com/github/copilot-cli/releases/download/${COPILOT_VERSION}/copilot-linux-x64.tar.gz" -o /tmp/copilot.tar.gz \
+    && tar -xzf /tmp/copilot.tar.gz -C /usr/local/bin \
+    && rm /tmp/copilot.tar.gz \
+    && chmod +x /usr/local/bin/copilot
 
 # Create non-root user
 RUN addgroup -S council && adduser -S council -G council
@@ -56,21 +58,16 @@ WORKDIR /app
 COPY --from=backend-builder /app/council .
 COPY --from=frontend-builder /app/frontend/dist ./static
 
-# Create data directory and set up Copilot CLI
+# Create data directory
 RUN mkdir -p /data && chown -R council:council /data /app
 
 # Switch to non-root user
 USER council
 
-# Install GitHub Copilot extension (requires gh to be available)
-RUN gh extension install github-copilot || true
-
 # Environment defaults
 ENV DATABASE_PATH=/data/council.db
 ENV PORT=8080
 ENV ENV=production
-# GitHub token should be provided at runtime for Copilot authentication
-# ENV GITHUB_TOKEN=
 
 EXPOSE 8080
 
