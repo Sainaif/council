@@ -150,12 +150,6 @@ func (s *Service) getOrCreateClient(userID, accessToken string) (*copilot.Client
 	return client, nil
 }
 
-// getLogLevel returns the appropriate log level based on environment
-func getLogLevel() string {
-	// Could read from config, default to error
-	return "error"
-}
-
 // ListModels returns available models for a user (dynamically fetched from Copilot)
 func (s *Service) ListModels(ctx context.Context, userID, accessToken string) ([]Model, error) {
 	// Check cache first
