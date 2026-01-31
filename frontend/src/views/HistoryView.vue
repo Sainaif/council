@@ -26,14 +26,14 @@ async function fetchHistory() {
 
 async function viewSession(session: any) {
   loadingDetails.value = true
-  expandedRounds.value = new Set()
+  expandedRounds.value = new Set<number>()
   try {
     // Fetch full session details including responses
     const response = await api.get(`/api/council/${session.id}`)
     selectedSession.value = response.data
     // Expand all rounds by default
     if (selectedSession.value?.responses) {
-      const rounds = new Set(selectedSession.value.responses.map((r: any) => r.round as number))
+      const rounds = new Set<number>(selectedSession.value.responses.map((r: any) => r.round as number))
       expandedRounds.value = rounds
     }
   } catch (e) {
