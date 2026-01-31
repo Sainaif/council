@@ -3,15 +3,16 @@ package copilot
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
 
 // Model represents an available AI model
 type Model struct {
-	ID          string   `json:"id"`
-	DisplayName string   `json:"display_name"`
-	Provider    string   `json:"provider"`
+	ID           string   `json:"id"`
+	DisplayName  string   `json:"display_name"`
+	Provider     string   `json:"provider"`
 	Capabilities []string `json:"capabilities"`
 }
 
@@ -91,6 +92,7 @@ func (s *Service) GetModel(ctx context.Context, id string) (*Model, error) {
 
 // SendPrompt sends a prompt to a model and returns the full response
 func (s *Service) SendPrompt(ctx context.Context, modelID, prompt string) (*Response, error) {
+	log.Printf("[COPILOT] SendPrompt - model: %s, prompt length: %d chars", modelID, len(prompt))
 	start := time.Now()
 
 	// TODO: Integrate with actual Copilot SDK
@@ -101,11 +103,13 @@ func (s *Service) SendPrompt(ctx context.Context, modelID, prompt string) (*Resp
 		ResponseTime: time.Since(start).Milliseconds(),
 	}
 
+	log.Printf("[COPILOT] SendPrompt completed - model: %s, response time: %dms", modelID, response.ResponseTime)
 	return response, nil
 }
 
 // StreamPrompt sends a prompt and streams the response
 func (s *Service) StreamPrompt(ctx context.Context, modelID, prompt string) (<-chan StreamChunk, error) {
+	log.Printf("[COPILOT] StreamPrompt - model: %s, prompt length: %d chars", modelID, len(prompt))
 	chunks := make(chan StreamChunk, 100)
 
 	go func() {

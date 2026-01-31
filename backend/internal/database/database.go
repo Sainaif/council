@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -19,6 +20,8 @@ type DB struct {
 }
 
 func New(dbPath string) (*DB, error) {
+	log.Printf("[DB] Opening database at: %s", dbPath)
+
 	// Ensure directory exists
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -36,6 +39,8 @@ func New(dbPath string) (*DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
+
+	log.Printf("[DB] Database connection established successfully")
 
 	// Configure connection pool
 	db.SetMaxOpenConns(1) // SQLite works best with single connection

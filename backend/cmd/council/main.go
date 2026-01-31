@@ -26,11 +26,25 @@ import (
 )
 
 func main() {
+	log.Println("========================================")
+	log.Println("       Council Arena Starting")
+	log.Println("========================================")
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+
+	// Log configuration (hide secrets)
+	log.Printf("Configuration loaded:")
+	log.Printf("  Environment: %s", cfg.Env)
+	log.Printf("  Port: %s", cfg.Port)
+	log.Printf("  Database: %s", cfg.DatabasePath)
+	log.Printf("  Frontend URL: %s", cfg.FrontendURL)
+	log.Printf("  OAuth Callback: %s", cfg.OAuthCallbackURL())
+	log.Printf("  Log Level: %s", cfg.LogLevel)
+	log.Printf("  GitHub OAuth: %s...", cfg.GitHubClientID[:min(8, len(cfg.GitHubClientID))])
 
 	// Initialize database
 	db, err := database.New(cfg.DatabasePath)
@@ -44,12 +58,14 @@ func main() {
 	}()
 
 	// Run migrations
+	log.Println("Running database migrations...")
 	if err := db.Migrate(); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 	log.Println("Database migrations completed")
 
 	// Initialize services
+	log.Println("Initializing services...")
 	authService := auth.NewGitHubAuth(cfg)
 	copilotService := copilot.NewService()
 	eloService := elo.NewCalculator(db)
@@ -58,6 +74,7 @@ func main() {
 
 	// Start WebSocket hub
 	go wsHub.Run()
+	log.Println("WebSocket hub started")
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, db, cfg)
@@ -75,9 +92,11 @@ func main() {
 	})
 
 	// Global middleware
-	app.Use(recover.New())
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace: true,
+	}))
 	app.Use(logger.New(logger.Config{
-		Format:     "${time} | ${status} | ${latency} | ${method} | ${path}\n",
+		Format:     "${time} | ${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}\n",
 		TimeFormat: "2006-01-02 15:04:05",
 	}))
 
@@ -150,6 +169,9 @@ func errorHandler(c *fiber.Ctx, err error) error {
 		code = e.Code
 		message = e.Message
 	}
+
+	// Log the error with context
+	log.Printf("[ERROR] %s %s - Status: %d - Error: %v", c.Method(), c.Path(), code, err)
 
 	return c.Status(code).JSON(fiber.Map{
 		"error":   true,

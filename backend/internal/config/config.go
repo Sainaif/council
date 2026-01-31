@@ -36,6 +36,9 @@ type Config struct {
 
 	// Data directory
 	DataDir string
+
+	// Logging
+	LogLevel string
 }
 
 func Load() (*Config, error) {
@@ -53,6 +56,7 @@ func Load() (*Config, error) {
 		Host:               getEnv("HOST", "0.0.0.0"),
 		Env:                getEnv("ENV", "development"),
 		DataDir:            dataDir,
+		LogLevel:           getEnv("LOG_LEVEL", "info"),
 	}
 
 	cfg.IsDev = cfg.Env == "development"

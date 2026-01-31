@@ -44,7 +44,17 @@ services:
       # Server configuration
       - PORT=8080
       - ENV=production
+
+      # Logging level (debug, info, warn, error)
+      - LOG_LEVEL=info
     restart: unless-stopped
+
+    # Logging configuration - makes it easy to view logs with 'docker compose logs'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   council_data:

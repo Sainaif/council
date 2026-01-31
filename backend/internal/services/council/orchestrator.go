@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -221,6 +222,8 @@ func (o *Orchestrator) validateRequest(req StartRequest) error {
 }
 
 func (o *Orchestrator) executeCouncil(ctx context.Context, session *Session, models []string) {
+	log.Printf("[ORCHESTRATOR] Starting council execution - session: %s, mode: %s, models: %v", session.ID, session.Mode, models)
+
 	// Update status to responding
 	o.updateSessionStatus(session.ID, StatusResponding)
 	o.hub.Broadcast(session.ID, websocket.EventCouncilStarted, map[string]interface{}{
@@ -231,6 +234,7 @@ func (o *Orchestrator) executeCouncil(ctx context.Context, session *Session, mod
 
 	switch session.Mode {
 	case ModeStandard:
+		log.Printf("[ORCHESTRATOR] Executing standard mode for session: %s", session.ID)
 		o.executeStandardMode(ctx, session, models)
 	case ModeDebate:
 		o.executeDebateMode(ctx, session, models)
@@ -351,6 +355,8 @@ func (o *Orchestrator) executeTournamentMode(ctx context.Context, session *Sessi
 }
 
 func (o *Orchestrator) collectResponses(ctx context.Context, session *Session, models []string, round int) ([]Response, error) {
+	log.Printf("[ORCHESTRATOR] Collecting responses - session: %s, round: %d, models: %v", session.ID, round, models)
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var responses []Response
@@ -564,6 +570,7 @@ func (o *Orchestrator) updateSessionStatus(sessionID string, status SessionStatu
 }
 
 func (o *Orchestrator) failSession(sessionID, reason string) {
+	log.Printf("[ORCHESTRATOR] Session failed - id: %s, reason: %s", sessionID, reason)
 	_, _ = o.db.Exec(`UPDATE sessions SET status = ? WHERE id = ?`, StatusFailed, sessionID)
 	o.hub.Broadcast(sessionID, websocket.EventCouncilFailed, map[string]string{
 		"reason": reason,
@@ -571,6 +578,7 @@ func (o *Orchestrator) failSession(sessionID, reason string) {
 }
 
 func (o *Orchestrator) completeSession(sessionID string) {
+	log.Printf("[ORCHESTRATOR] Session completed - id: %s", sessionID)
 	_, _ = o.db.Exec(`UPDATE sessions SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`, StatusCompleted, sessionID)
 	o.hub.Broadcast(sessionID, websocket.EventCouncilCompleted, nil)
 }

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/sainaif/council/internal/database"
@@ -32,6 +34,7 @@ type StartCouncilRequest struct {
 func (h *CouncilHandler) Start(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
+		log.Printf("[COUNCIL] Start request rejected - no user ID")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error":   true,
 			"message": "Unauthorized",
@@ -40,11 +43,15 @@ func (h *CouncilHandler) Start(c *fiber.Ctx) error {
 
 	var req StartCouncilRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("[COUNCIL] Start request rejected - invalid body: %v", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": "Invalid request body",
 		})
 	}
+
+	log.Printf("[COUNCIL] Starting session - user: %s, mode: %s, models: %v, question: %.50s...",
+		userID, req.Mode, req.Models, req.Question)
 
 	// Map to internal request
 	startReq := council.StartRequest{
@@ -61,11 +68,14 @@ func (h *CouncilHandler) Start(c *fiber.Ctx) error {
 
 	session, err := h.orchestrator.StartSession(c.Context(), userID, startReq)
 	if err != nil {
+		log.Printf("[COUNCIL] Failed to start session for user %s: %v", userID, err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": err.Error(),
 		})
 	}
+
+	log.Printf("[COUNCIL] Session started successfully - id: %s, status: %s", session.ID, session.Status)
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"session_id": session.ID,

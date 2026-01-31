@@ -45,8 +45,11 @@ func (h *AuthHandler) Callback(c *fiber.Ctx) error {
 	state := c.Query("state")
 	storedState := c.Cookies("oauth_state")
 
+	log.Printf("[AUTH] OAuth callback received - state match: %v", state == storedState)
+
 	// Validate state
 	if state == "" || state != storedState {
+		log.Printf("[AUTH] Invalid OAuth state - received: %s, expected: %s", state, storedState)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": "Invalid OAuth state",
@@ -62,22 +65,28 @@ func (h *AuthHandler) Callback(c *fiber.Ctx) error {
 	})
 
 	// Exchange code for token
+	log.Printf("[AUTH] Exchanging OAuth code for token...")
 	token, err := h.auth.Exchange(c.Context(), code)
 	if err != nil {
+		log.Printf("[AUTH] Failed to exchange OAuth code: %v", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": "Failed to exchange OAuth code",
 		})
 	}
+	log.Printf("[AUTH] OAuth token obtained successfully")
 
 	// Get user info
+	log.Printf("[AUTH] Fetching GitHub user info...")
 	user, err := h.auth.GetUser(c.Context(), token)
 	if err != nil {
+		log.Printf("[AUTH] Failed to get user info: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   true,
 			"message": "Failed to get user info",
 		})
 	}
+	log.Printf("[AUTH] GitHub user authenticated: %s (ID: %d)", user.Login, user.ID)
 
 	// Create or update user preferences
 	// Use fmt.Sprintf to convert int64 to string to match JWT token's UserID format
